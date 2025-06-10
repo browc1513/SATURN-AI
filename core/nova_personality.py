@@ -45,8 +45,15 @@ class NOVA:
 
     def random_reference(self):
         sources = []
-        for category in self.references.values():
-            sources.extend(category)
+        for key, value in self.references.items():
+            if isinstance(value, list):
+                sources.extend(value)
         if sources:
             return random.choice(sources)
         return None
+
+    def say(self, message):
+        reference = self.random_reference()
+        if reference:
+            return f"{self.name}: {message} (btw, remember {reference})"
+        return f"{self.name}: {message}"
