@@ -1,8 +1,8 @@
 import numpy as np 
 from math_engine import *
-from core.nova_instance import nova
+from core.nova_instance import get_nova
 
-nova.react_to_task("math")  # Science Mode for physics in flight
+nova = get_nova("nova_config.json")
 
 def vector_displacement(r0, v0, a, t):
     """Computes displacement vector using r = r0 + v0*t + (1/2)*a*t^2"""

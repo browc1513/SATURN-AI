@@ -1,6 +1,7 @@
 import numpy as np
-from math_engine import *  # Preemptive import for future expansion
-from core.nova_instance import nova
+from core.nova_instance import get_nova
+
+nova = get_nova("nova_config.json")
 
 nova.react_to_task("math")  # Still fits under Science Mode
 

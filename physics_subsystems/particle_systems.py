@@ -1,8 +1,8 @@
 import numpy as np
 from math_engine import *  # For future expansion with calculus operations
-from core.nova_instance import nova
+from core.nova_instance import get_nova
 
-nova.react_to_task("math")  # Science Mode active
+nova = get_nova("nova_config.json")
 
 # Center of Mass: R = (Σ m_i * r_i) / Σ m_i
 def center_of_mass(masses, positions):

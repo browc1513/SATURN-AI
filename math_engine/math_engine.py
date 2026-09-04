@@ -6,7 +6,12 @@ from numpy import mean, std
 from scipy.stats import norm
 from numpy.fft import fft, ifft
 
-from core.nova_instance import nova
+from math_engine.linear_algebra import rref
+
+from core.nova_instance import get_nova
+
+nova = get_nova("nova_config.json")
+
 nova.react_to_task("math")  # Activates Science Mode
 
 # Basic Arithmetic Operations
@@ -62,6 +67,13 @@ def matrix_eigenvalues(A):
     """Returns the eigenvalues of matrix A."""
     nova.speak("Finding eigenvalues... or as I like to call them, the matrix’s inner thoughts.")
     return eig(A)[0]
+
+def matrix_rref(A):
+    """Returns the Reduced Row Echelon Form of matrix A."""
+
+    rref_matrix, pivot_columns = rref(A)
+
+    return rref_matrix, pivot_columns
 
 # Statistical & Probability Functions
 def compute_mean(data):

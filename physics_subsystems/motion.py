@@ -1,8 +1,8 @@
 import numpy as np
 from math_engine import *
-from core.nova_instance import nova
+from core.nova_instance import get_nova
 
-nova.react_to_task("math")  # Science Mode activated for motion calculations
+nova = get_nova("nova_config.json")
 
 def displacement(v0, a, t):
     """Computes displacement using s = v0*t + (1/2)*a*t^2"""
