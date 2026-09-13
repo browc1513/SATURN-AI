@@ -200,6 +200,29 @@ def _steps_circle_area(arguments, exact_result):
     ]
 
 
+def _steps_circle_circumference_from_diameter(
+    arguments,
+    exact_result,
+):
+    """
+    Generate steps for circle circumference when diameter is given.
+    """
+
+    diameter = arguments.get(
+        "diameter"
+    )
+
+    if diameter is None:
+        return None
+
+    return [
+        "Use the circle circumference formula C = pi*d.",
+        f"Substitute d = {diameter}.",
+        f"C = pi*({diameter}).",
+        f"Therefore, C = {exact_result}."
+    ]
+
+
 def _steps_sphere_volume(arguments, exact_result):
     """
     Generate steps for the volume of a sphere.
@@ -375,6 +398,9 @@ STEP_GENERATORS = {
     "divide": _steps_divide,
     "solve_equation": _steps_solve_equation,
     "circle_area": _steps_circle_area,
+    "circle_circumference_from_diameter": (
+        _steps_circle_circumference_from_diameter
+    ),
     "sphere_volume": _steps_sphere_volume,
     "derivative": _steps_derivative,
 

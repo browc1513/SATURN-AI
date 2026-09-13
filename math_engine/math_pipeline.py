@@ -2,6 +2,7 @@ from math_engine.step_engine import generate_steps
 from math_engine.interpreter import interpret_math_request
 from math_engine.router import select_math_operation
 from math_engine.executor import execute_math_operation
+from math_engine.algebra import parse_expression
 from math_engine.argument_extractor import (
     extract_arguments_for_operation,
 )
@@ -85,6 +86,65 @@ def interpret_and_execute_math(text):
         result["error"] = (
             interpretation["error"]
         )
+
+        return result
+
+    # ========================================================
+    # STAGE 1B — BARE SYMBOLIC EXPRESSION
+    # ========================================================
+    #
+    # A request such as:
+    #
+    #     "What is x squared plus 3x plus 2?"
+    #
+    # contains a mathematical expression but does not request an
+    # operation such as simplify, factor, solve, or differentiate.
+    # SATURN should preserve that intent rather than invent one.
+    #
+    # The expression is still parsed deterministically through the
+    # algebra subsystem so invalid syntax fails cleanly.
+    # ========================================================
+
+    bare_expression = interpretation.get(
+        "bare_expression"
+    )
+
+    if bare_expression is not None:
+
+        try:
+            parsed_expression = parse_expression(
+                bare_expression
+            )
+
+        except Exception as exc:
+            result["stage"] = "interpretation"
+            result["error"] = (
+                "The symbolic expression could not be parsed: "
+                + str(exc)
+            )
+            return result
+
+        result["success"] = True
+        result["stage"] = "complete"
+        result["operation"] = "expression"
+        result["arguments"] = {
+            "expression": bare_expression
+        }
+        result["exact_result"] = parsed_expression
+        result["decimal_result"] = None
+        result["steps"] = []
+        result["routing_execution"] = {
+            "success": True,
+            "stage": "expression",
+            "query": interpretation.get(
+                "normalized_text",
+                bare_expression,
+            ),
+            "operation": "expression",
+            "routing": None,
+            "execution": None,
+            "error": None,
+        }
 
         return result
 

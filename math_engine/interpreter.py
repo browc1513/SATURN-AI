@@ -85,6 +85,25 @@ def normalize_math_language(text):
         flags=re.IGNORECASE,
     )
 
+    # --------------------------------------------------------
+    # IMPLICIT MULTIPLICATION
+    # --------------------------------------------------------
+    #
+    # Convert simple coefficient-variable notation into explicit
+    # multiplication so SymPy and SATURN's extractors receive:
+    #
+    #     3x   -> 3*x
+    #     12y  -> 12*y
+    #
+    # This is intentionally conservative in this cleanup pass.
+    # --------------------------------------------------------
+
+    text = re.sub(
+        r"(?<![A-Za-z0-9_])(\d+(?:\.\d+)?)\s*([A-Za-z])\b",
+        r"\1*\2",
+        text,
+    )
+
     # Normalize repeated whitespace.
     text = re.sub(
         r"\s+",
@@ -93,6 +112,103 @@ def normalize_math_language(text):
     ).strip()
 
     return text
+
+
+# ============================================================
+# SYMBOLIC ALGEBRA DETECTION
+# ============================================================
+
+def _contains_symbolic_algebra_structure(text):
+    """
+    Return True when text contains a variable participating in
+    recognizable algebraic expression syntax.
+
+    Examples:
+        x**2 + 3*x + 2
+        y^3
+        4*x - 7 = 21
+
+    This prevents numeric fragments inside symbolic expressions
+    from being mistaken for standalone arithmetic.
+    """
+
+    text = str(text)
+
+    patterns = [
+        r"\b[A-Za-z]\b\s*(?:\*\*|\^|[+\-*/=])",
+        r"(?:\*\*|\^|[+\-*/=])\s*\b[A-Za-z]\b",
+        r"\b\d+(?:\.\d+)?\s*\*\s*[A-Za-z]\b",
+    ]
+
+    return any(
+        re.search(pattern, text)
+        for pattern in patterns
+    )
+
+
+def extract_bare_symbolic_expression(text):
+    """
+    Extract a symbolic expression when the user supplied an
+    expression but did not request a mathematical operation.
+
+    Examples:
+        "what is x**2 + 3*x + 2?" -> "x**2 + 3*x + 2"
+        "what is x**3?"           -> "x**3"
+
+    Explicit operation requests such as factor, simplify, solve,
+    derivative, and integral are intentionally excluded.
+    """
+
+    text = str(text).strip()
+
+    operation_cues = (
+        "solve",
+        "factor",
+        "expand",
+        "simplify",
+        "derivative",
+        "integral",
+        "differentiate",
+        "integrate",
+        "evaluate",
+        "calculate",
+        "compute",
+        "find roots",
+        "roots of",
+    )
+
+    lowered = text.lower()
+
+    if any(
+        cue in lowered
+        for cue in operation_cues
+    ):
+        return None
+
+    cleaned = re.sub(
+        r"^\s*(?:what\s+is|what's)\s+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    cleaned = cleaned.strip(" .?!")
+
+    if not cleaned:
+        return None
+
+    # Require symbolic structure rather than a plain word or number.
+    if not _contains_symbolic_algebra_structure(cleaned):
+        return None
+
+    # Keep this path conservative: only expression characters.
+    if not re.fullmatch(
+        r"[0-9A-Za-z_+\-*/^().\s]+",
+        cleaned,
+    ):
+        return None
+
+    return cleaned
 
 
 # ============================================================
@@ -219,6 +335,44 @@ def detect_subsystem(text):
         flags=re.IGNORECASE,
     ):
         return "trigonometry"
+
+    # --------------------------------------------------------
+    # EXPLICIT CALCULUS INTENT
+    # --------------------------------------------------------
+
+    if re.search(
+        r"\b(?:derivative|integral|limit|continuity|gradient|"
+        r"partial|taylor|maclaurin|divergence|curl)\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return "calculus"
+
+    # --------------------------------------------------------
+    # EXPLICIT ALGEBRA INTENT
+    # --------------------------------------------------------
+
+    if re.search(
+        r"\b(?:equation|solve|factor|expand|simplify|polynomial|"
+        r"quadratic|inequality|root|roots)\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return "algebra"
+
+    # --------------------------------------------------------
+    # SYMBOLIC ALGEBRA STRUCTURE
+    # --------------------------------------------------------
+    #
+    # This must occur before direct arithmetic detection. Otherwise
+    # text such as "x**2 + 3*x + 2" can accidentally expose the
+    # numeric fragment "2 + 3" and be routed as addition.
+    # --------------------------------------------------------
+
+    if _contains_symbolic_algebra_structure(
+        text
+    ):
+        return "algebra"
 
     # --------------------------------------------------------
     # DIRECT ARITHMETIC SYMBOLS
@@ -578,6 +732,7 @@ def interpret_math_request(text):
         "query": "",
         "subsystem": None,
         "arguments": {},
+        "bare_expression": None,
         "warnings": [],
         "error": None
     }
@@ -636,6 +791,22 @@ def interpret_math_request(text):
     result[
         "arguments"
     ] = arguments
+
+    # --------------------------------------------------------
+    # BARE SYMBOLIC EXPRESSION
+    # --------------------------------------------------------
+    #
+    # If the user supplied a valid symbolic expression without
+    # requesting an operation, preserve that intent rather than
+    # inventing simplify/factor/solve behavior.
+    # --------------------------------------------------------
+
+    if subsystem == "algebra":
+        result[
+            "bare_expression"
+        ] = extract_bare_symbolic_expression(
+            normalized_text
+        )
 
     # --------------------------------------------------------
     # BUILD ROUTER QUERY

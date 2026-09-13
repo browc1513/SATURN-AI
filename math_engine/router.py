@@ -309,6 +309,31 @@ def _equation_structure_score(query, operation_name):
 
 
 
+def _contains_symbolic_variable_structure(text):
+    """
+    Detect variable-bearing algebraic syntax so direct arithmetic
+    scoring does not steal numeric fragments from expressions.
+
+    Example:
+        x**2 + 3*x + 2
+
+    must not be interpreted as the standalone arithmetic "2 + 3".
+    """
+
+    text = str(text)
+
+    patterns = [
+        r"\b[A-Za-z]\b\s*(?:\*\*|\^|[+\-*/=])",
+        r"(?:\*\*|\^|[+\-*/=])\s*\b[A-Za-z]\b",
+        r"\b\d+(?:\.\d+)?\s*\*\s*[A-Za-z]\b",
+    ]
+
+    return any(
+        re.search(pattern, text)
+        for pattern in patterns
+    )
+
+
 def _direct_arithmetic_score(query, operation_name):
     """
     Score direct binary arithmetic operations from explicit
@@ -326,6 +351,13 @@ def _direct_arithmetic_score(query, operation_name):
 
     text = str(query).strip().lower()
     operation_name = str(operation_name).lower()
+
+    # A symbolic expression may contain numeric substrings that look
+    # like standalone arithmetic. Do not score those fragments.
+    if _contains_symbolic_variable_structure(
+        text
+    ):
+        return 0
 
     operation_patterns = {
         "add": r"-?\d+(?:\.\d+)?\s*\+\s*-?\d+(?:\.\d+)?",

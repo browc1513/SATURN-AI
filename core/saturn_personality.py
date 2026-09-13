@@ -2,6 +2,8 @@ import json
 import random
 import os
 import re
+import threading
+import time
 
 
 class SATURN:
@@ -11,6 +13,18 @@ class SATURN:
         self.voice_enabled = False
 
         self.load_config(config_path)
+
+        # Start SATURN's background alarm monitor.
+        # It runs only while the SATURN process is alive.
+        self._alarm_monitor_running = True
+
+        self._alarm_monitor_thread = threading.Thread(
+            target=self._alarm_monitor_loop,
+            daemon=True,
+            name="SATURNAlarmMonitor",
+        )
+
+        self._alarm_monitor_thread.start()
 
     # ============================================================
     # CONFIGURATION
@@ -140,6 +154,69 @@ class SATURN:
         )
 
     # ============================================================
+    # BACKGROUND ALARM MONITOR
+    # ============================================================
+
+    def _alarm_monitor_loop(self):
+        """
+        Check once per second for alarms that have become due.
+
+        check_due_alarms() marks returned alarms as fired, so each
+        alarm is triggered only once.
+        """
+
+        while self._alarm_monitor_running:
+            try:
+                from assistant_tools.alarm_tool import (
+                    check_due_alarms,
+                    play_alarm_sound,
+                )
+
+                due_alarms = check_due_alarms(
+                    mark_fired=True
+                )
+
+                for alarm in due_alarms:
+                    trigger_at = alarm.get(
+                        "trigger_at",
+                        "",
+                    )
+
+                    print(
+                        "\n"
+                        "S.A.T.U.R.N. ALARM: "
+                        f"Alarm due at {trigger_at}"
+                    )
+
+                    # Run the Windows sound in its own daemon thread
+                    # so SATURN stays responsive while the alarm plays.
+                    threading.Thread(
+                        target=play_alarm_sound,
+                        kwargs={
+                            "repetitions": 5,
+                        },
+                        daemon=True,
+                        name="SATURNAlarmSound",
+                    ).start()
+
+            except Exception as error:
+                print(
+                    "S.A.T.U.R.N. alarm monitor warning: "
+                    f"{error}"
+                )
+
+            time.sleep(
+                1
+            )
+
+    def stop_alarm_monitor(self):
+        """
+        Stop the background alarm monitor cleanly.
+        """
+
+        self._alarm_monitor_running = False
+
+    # ============================================================
     # CENTRAL LANGUAGE USER INTERFACE
     # ============================================================
 
@@ -191,13 +268,33 @@ class SATURN:
                 text
             )
 
+        if domain == "time":
+            return self._handle_time_query(
+                text
+            )
+
+        if domain == "weather":
+            return self._handle_weather_query(
+                text
+            )
+
+        if domain == "lists":
+            return self._handle_list_query(
+                text
+            )
+
+        if domain == "alarms":
+            return self._handle_alarm_query(
+                text
+            )
+
         return {
             "success": False,
             "domain": "unknown",
             "response": (
                 "I'm not sure which subsystem should handle "
                 "that request yet. Right now I can automatically "
-                "route mathematical and veterinary queries."
+                "route mathematical, veterinary, time, weather, list, and alarm queries."
             ),
             "data": None,
         }
@@ -222,6 +319,32 @@ class SATURN:
             .lower()
             .strip()
         )
+
+        # --------------------------------------------------------
+        # Time / date routing
+        # --------------------------------------------------------
+
+        time_patterns = [
+            r"\bwhat\s+time\s+is\s+it\b",
+            r"\bwhat'?s\s+the\s+time\b",
+            r"\bcurrent\s+time\b",
+            r"\btime\s+right\s+now\b",
+            r"\bwhat\s+time\s+is\s+it\s+in\b",
+            r"\bwhat'?s\s+today'?s\s+date\b",
+            r"\bwhat\s+is\s+today'?s\s+date\b",
+            r"\bwhat\s+date\s+is\s+it\b",
+            r"\bwhat\s+day\s+is\s+it\b",
+            r"\btoday'?s\s+date\b",
+        ]
+
+        if any(
+            re.search(
+                pattern,
+                normalized,
+            )
+            for pattern in time_patterns
+        ):
+            return "time"
 
         # --------------------------------------------------------
         # Veterinary routing
@@ -276,6 +399,102 @@ class SATURN:
             return "veterinary"
 
         # --------------------------------------------------------
+        # Weather routing
+        # --------------------------------------------------------
+
+        weather_keywords = [
+            "weather",
+            "forecast",
+            "temperature",
+            "outside",
+            "rain",
+            "raining",
+            "snow",
+            "snowing",
+            "humidity",
+            "wind",
+            "windy",
+        ]
+
+        if self._contains_any_keyword(
+            normalized,
+            weather_keywords,
+        ):
+            return "weather"
+
+        # --------------------------------------------------------
+        # Alarm routing
+        # --------------------------------------------------------
+
+        alarm_keywords = [
+            "alarm",
+            "alarms",
+            "wake me",
+            "wake me up",
+        ]
+
+        alarm_patterns = [
+            r"\bset\s+(?:an\s+|a\s+)?alarm\b",
+            r"\bcancel\s+(?:my\s+)?alarm\b",
+            r"\bdelete\s+(?:my\s+)?alarm\b",
+            r"\bshow\s+(?:me\s+)?(?:my\s+)?alarms?\b",
+            r"\blist\s+(?:my\s+)?alarms?\b",
+        ]
+
+        if (
+            self._contains_any_keyword(
+                normalized,
+                alarm_keywords,
+            )
+            or any(
+                re.search(
+                    pattern,
+                    normalized,
+                )
+                for pattern in alarm_patterns
+            )
+        ):
+            return "alarms"
+
+        # --------------------------------------------------------
+        # List routing
+        # --------------------------------------------------------
+
+        list_keywords = [
+            "list",
+            "grocery list",
+            "shopping list",
+            "todo list",
+            "to-do list",
+            "checklist",
+        ]
+
+        list_action_patterns = [
+            r"\bcreate\s+(?:a\s+|my\s+)?[a-z0-9 _-]*list\b",
+            r"\bmake\s+(?:a\s+|my\s+)?[a-z0-9 _-]*list\b",
+            r"\bshow\s+(?:me\s+)?(?:my\s+)?[a-z0-9 _-]*list\b",
+            r"\badd\b.+\bto\b.+\blist\b",
+            r"\bremove\b.+\bfrom\b.+\blist\b",
+            r"\bdelete\b.+\bfrom\b.+\blist\b",
+            r"\bclear\b.+\blist\b",
+        ]
+
+        if (
+            self._contains_any_keyword(
+                normalized,
+                list_keywords,
+            )
+            or any(
+                re.search(
+                    pattern,
+                    normalized,
+                )
+                for pattern in list_action_patterns
+            )
+        ):
+            return "lists"
+
+        # --------------------------------------------------------
         # Math routing
         # --------------------------------------------------------
 
@@ -306,6 +525,10 @@ class SATURN:
             "simplify",
             "expand",
             "polynomial",
+            "squared",
+            "cubed",
+            "power",
+            "powers",
 
             # Calculus
             "calculus",
@@ -515,15 +738,22 @@ class SATURN:
             [],
         )
 
-        if operation:
-            lines.append(
-                f"Operation: {operation}"
-            )
+        if operation == "expression":
+            if exact_result is not None:
+                lines.append(
+                    f"Expression: {exact_result}"
+                )
 
-        if exact_result is not None:
-            lines.append(
-                f"Result: {exact_result}"
-            )
+        else:
+            if operation:
+                lines.append(
+                    f"Operation: {operation}"
+                )
+
+            if exact_result is not None:
+                lines.append(
+                    f"Result: {exact_result}"
+                )
 
         if (
             decimal_result is not None
@@ -560,6 +790,190 @@ class SATURN:
         return "\n".join(
             lines
         )
+
+    # ============================================================
+    # ALARM SUBSYSTEM
+    # ============================================================
+
+    def _handle_alarm_query(
+        self,
+        text,
+    ):
+        """
+        Send a natural-language alarm request through SATURN's
+        persistent local alarm tool.
+        """
+
+        from assistant_tools.alarm_tool import (
+            handle_alarm_query,
+        )
+
+        try:
+            result = handle_alarm_query(
+                text
+            )
+
+        except Exception as error:
+            return {
+                "success": False,
+                "domain": "alarms",
+                "response": (
+                    "Something went wrong while working with "
+                    f"your alarms:\n{error}"
+                ),
+                "data": None,
+            }
+
+        return {
+            "success": result.get(
+                "success",
+                False,
+            ),
+            "domain": "alarms",
+            "response": result.get(
+                "response",
+                "I couldn't complete that alarm request.",
+            ),
+            "data": result,
+        }
+
+    # ============================================================
+    # LIST SUBSYSTEM
+    # ============================================================
+
+    def _handle_list_query(
+        self,
+        text,
+    ):
+        """
+        Send a natural-language list request through SATURN's
+        persistent local list tool.
+        """
+
+        from assistant_tools.list_tool import (
+            handle_list_query,
+        )
+
+        try:
+            result = handle_list_query(
+                text
+            )
+
+        except Exception as error:
+            return {
+                "success": False,
+                "domain": "lists",
+                "response": (
+                    "Something went wrong while working with "
+                    f"your lists:\n{error}"
+                ),
+                "data": None,
+            }
+
+        return {
+            "success": result.get(
+                "success",
+                False,
+            ),
+            "domain": "lists",
+            "response": result.get(
+                "response",
+                "I couldn't complete that list request.",
+            ),
+            "data": result,
+        }
+
+    # ============================================================
+    # WEATHER SUBSYSTEM
+    # ============================================================
+
+    def _handle_weather_query(
+        self,
+        text,
+    ):
+        """
+        Send a natural-language weather request through SATURN's
+        live weather tool.
+        """
+
+        from assistant_tools.weather_tool import (
+            handle_weather_query,
+        )
+
+        try:
+            result = handle_weather_query(
+                text
+            )
+
+        except Exception as error:
+            return {
+                "success": False,
+                "domain": "weather",
+                "response": (
+                    "Something went wrong while checking "
+                    f"the weather:\n{error}"
+                ),
+                "data": None,
+            }
+
+        return {
+            "success": result.get(
+                "success",
+                False,
+            ),
+            "domain": "weather",
+            "response": result.get(
+                "response",
+                "I couldn't retrieve the weather.",
+            ),
+            "data": result,
+        }
+
+    # ============================================================
+    # TIME / DATE SUBSYSTEM
+    # ============================================================
+
+    def _handle_time_query(
+        self,
+        text,
+    ):
+        """
+        Send a natural-language time/date request through SATURN's
+        deterministic time tool.
+        """
+
+        from assistant_tools.time_tool import (
+            handle_time_query,
+        )
+
+        try:
+            result = handle_time_query(
+                text
+            )
+
+        except Exception as error:
+            return {
+                "success": False,
+                "domain": "time",
+                "response": (
+                    "Something went wrong while checking "
+                    f"the time or date:\n{error}"
+                ),
+                "data": None,
+            }
+
+        return {
+            "success": result.get(
+                "success",
+                False,
+            ),
+            "domain": "time",
+            "response": result.get(
+                "response",
+                "I couldn't determine the requested time or date.",
+            ),
+            "data": result,
+        }
 
     # ============================================================
     # VETERINARY SUBSYSTEM

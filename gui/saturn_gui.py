@@ -1,5 +1,6 @@
 import sys
 import os
+import threading
 import tkinter as tk
 
 
@@ -14,21 +15,33 @@ sys.path.append(PROJECT_ROOT)
 # ---------- Import S.A.T.U.R.N. ----------
 
 from core.saturn_instance import get_saturn
+from voice.speech_to_text import listen_once
+from voice.text_to_speech import (
+    speak_async,
+    set_voice_enabled,
+    is_voice_enabled,
+)
 
 saturn = get_saturn("saturn_config.json")
+
+STARTUP_INTRODUCTION = (
+    "S.A.T.U.R.N. is online and ready. "
+    "Voice interface active."
+)
 
 
 # ============================================================
 # GUI FUNCTIONS
 # ============================================================
 
-def submit_query(event=None):
+def process_query(query):
     """
-    Send the user's text directly to SATURN's central
-    Language User Interface.
+    Send text directly to SATURN's central Language User Interface.
+
+    Both typed input and speech recognition use this same function.
     """
 
-    query = query_var.get().strip()
+    query = str(query).strip()
 
     if not query:
         return
@@ -36,8 +49,6 @@ def submit_query(event=None):
     update_chat(
         f"\nYou:\n{query}\n"
     )
-
-    query_var.set("")
 
     try:
         result = saturn.handle_query(query)
@@ -51,6 +62,10 @@ def submit_query(event=None):
             f"{saturn.name}:\n\n{response}\n"
         )
 
+        speak_async(
+            response
+        )
+
     except Exception as error:
         update_chat(
             f"{saturn.name}:\n\n"
@@ -59,6 +74,139 @@ def submit_query(event=None):
         )
 
     query_entry.focus_set()
+
+
+def submit_query(event=None):
+    """
+    Submit text currently in the chat entry box.
+    """
+
+    query = query_var.get().strip()
+
+    if not query:
+        return
+
+    query_var.set("")
+
+    process_query(
+        query
+    )
+
+
+# ============================================================
+# PUSH-TO-TALK
+# ============================================================
+
+def start_push_to_talk():
+    """
+    Start one microphone listening session in a background thread.
+
+    The GUI remains responsive while SATURN listens.
+    """
+
+    if mic_button.cget("state") == "disabled":
+        return
+
+    mic_button.configure(
+        state="disabled",
+        text="Listening..."
+    )
+
+    query_entry.configure(
+        state="disabled"
+    )
+
+    threading.Thread(
+        target=_push_to_talk_worker,
+        daemon=True,
+        name="SATURNPushToTalk",
+    ).start()
+
+
+def _push_to_talk_worker():
+    """
+    Perform speech recognition away from Tkinter's GUI thread.
+    """
+
+    result = listen_once()
+
+    root.after(
+        0,
+        lambda: _finish_push_to_talk(
+            result
+        )
+    )
+
+
+def _finish_push_to_talk(result):
+    """
+    Return the microphone result to the Tkinter thread.
+    """
+
+    mic_button.configure(
+        state="normal",
+        text="🎤 Talk"
+    )
+
+    query_entry.configure(
+        state="normal"
+    )
+
+    if not result.get(
+        "success",
+        False,
+    ):
+        update_chat(
+            f"{saturn.name}:\n\n"
+            f"{result.get('response', 'I could not understand the microphone input.')}\n"
+        )
+
+        query_entry.focus_set()
+        return
+
+    transcript = result.get(
+        "text",
+        ""
+    ).strip()
+
+    if not transcript:
+        query_entry.focus_set()
+        return
+
+    # Show exactly what speech recognition heard and route it through
+    # the same SATURN.handle_query() path used by typed messages.
+    query_var.set(
+        transcript
+    )
+
+    root.update_idletasks()
+
+    submit_query()
+
+
+# ============================================================
+# TEXT-TO-SPEECH CONTROL
+# ============================================================
+
+def toggle_voice():
+    """
+    Enable or disable spoken SATURN responses.
+    """
+
+    new_state = not is_voice_enabled()
+
+    set_voice_enabled(
+        new_state
+    )
+
+    if new_state:
+        voice_button.configure(
+            text="🔊 Voice: On"
+        )
+    else:
+        voice_button.configure(
+            text="🔇 Voice: Off"
+        )
 
 
 # ============================================================
@@ -182,6 +330,34 @@ query_entry.pack(
     padx=(0, 8)
 )
 
+voice_button = tk.Button(
+    input_frame,
+    text="🔊 Voice: On",
+    command=toggle_voice,
+    font=("Consolas", 11),
+    padx=12,
+    pady=8
+)
+
+voice_button.pack(
+    side="left",
+    padx=(0, 8)
+)
+
+mic_button = tk.Button(
+    input_frame,
+    text="🎤 Talk",
+    command=start_push_to_talk,
+    font=("Consolas", 11),
+    padx=14,
+    pady=8
+)
+
+mic_button.pack(
+    side="left",
+    padx=(0, 8)
+)
+
 send_button = tk.Button(
     input_frame,
     text="Send",
@@ -206,7 +382,11 @@ query_entry.bind(
 # ============================================================
 
 update_chat(
-    f"{saturn.name} is online and ready."
+    STARTUP_INTRODUCTION
+)
+
+speak_async(
+    STARTUP_INTRODUCTION
 )
 
 query_entry.focus_set()
