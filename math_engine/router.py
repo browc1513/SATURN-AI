@@ -301,6 +301,51 @@ def _equation_structure_score(query, operation_name):
     return 0
 
 
+
+def _direct_arithmetic_score(query, operation_name):
+    """
+    Score direct binary arithmetic operations from explicit
+    mathematical operators in the routing query.
+
+    Examples:
+        17 + 28  -> add
+        17 - 8   -> subtract
+        6 * 4    -> multiply
+        20 / 5   -> divide
+
+    This only scores clear binary arithmetic syntax. More
+    complicated expressions continue through normal routing.
+    """
+
+    text = str(query).strip().lower()
+    operation_name = str(operation_name).lower()
+
+    operation_patterns = {
+        "add": r"-?\d+(?:\.\d+)?\s*\+\s*-?\d+(?:\.\d+)?",
+        "subtract": r"-?\d+(?:\.\d+)?\s*-\s*-?\d+(?:\.\d+)?",
+        "multiply": r"-?\d+(?:\.\d+)?\s*\*\s*-?\d+(?:\.\d+)?",
+        "divide": r"-?\d+(?:\.\d+)?\s*/\s*-?\d+(?:\.\d+)?",
+    }
+
+    detected_operation = None
+
+    for target_operation, pattern in operation_patterns.items():
+        if re.search(pattern, text):
+            detected_operation = target_operation
+            break
+
+    if detected_operation is None:
+        return 0
+
+    if operation_name == detected_operation:
+        return 50
+
+    if operation_name in operation_patterns:
+        return -20
+
+    return -10
+
+
 def _direct_trig_function_score(query, operation_name):
     """
     Score direct trigonometric function evaluations.
@@ -590,6 +635,15 @@ def find_math_operations(
         # ----------------------------------------------------
 
         score += _equation_structure_score(
+            query,
+            operation["name"]
+        )
+
+        # ----------------------------------------------------
+        # DIRECT ARITHMETIC EVALUATION
+        # ----------------------------------------------------
+
+        score += _direct_arithmetic_score(
             query,
             operation["name"]
         )

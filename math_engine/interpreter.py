@@ -142,6 +142,37 @@ def detect_subsystem(text):
         subsystem name or None
     """
 
+    text = str(text)
+
+    # --------------------------------------------------------
+    # DIRECT ARITHMETIC SYMBOLS
+    # --------------------------------------------------------
+    #
+    # Recognize simple binary arithmetic before word-based
+    # subsystem scoring.
+    #
+    # Examples:
+    #     17 + 28
+    #     10 - 4
+    #     6 * 7
+    #     20 / 5
+    # --------------------------------------------------------
+
+    number_pattern = r"-?\d+(?:\.\d+)?"
+
+    direct_arithmetic_patterns = [
+        rf"{number_pattern}\s*\+\s*{number_pattern}",
+        rf"{number_pattern}\s*-\s*{number_pattern}",
+        rf"{number_pattern}\s*\*\s*{number_pattern}",
+        rf"{number_pattern}\s*/\s*{number_pattern}",
+    ]
+
+    if any(
+        re.search(pattern, text)
+        for pattern in direct_arithmetic_patterns
+    ):
+        return "arithmetic"
+
     words = set(
         re.findall(
             r"[a-zA-Z]+",

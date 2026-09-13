@@ -1,3 +1,5 @@
+import re
+
 from veterinary_subsystem.database_loader import load_veterinary_database
 
 
@@ -14,6 +16,36 @@ FIELD_WEIGHTS = {
     "complications": 2,
     "diagnostic_approach": 2,
     "high_yield_notes": 1,
+}
+
+
+VETERINARY_STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "has",
+    "have",
+    "having",
+    "in",
+    "into",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "what",
+    "which",
+    "who",
+    "with",
 }
 
 
@@ -53,6 +85,58 @@ def matches_structured_filters(row, guide, structured_filters):
     return True
 
 
+def _clean_search_terms(search_query, structured_filters=None):
+    """
+    Convert free-text input into meaningful clinical search terms.
+
+    Common stop words are removed. Values already used as structured
+    filters, such as "cattle", are also removed from free-text scoring
+    so they do not artificially increase coverage.
+    """
+
+    structured_values = set()
+
+    if structured_filters:
+        structured_values = {
+            str(value).strip().lower()
+            for value in structured_filters.values()
+            if str(value).strip()
+        }
+
+    raw_terms = re.findall(
+        r"[A-Za-z0-9_-]+",
+        str(search_query).lower()
+    )
+
+    return [
+        term
+        for term in raw_terms
+        if (
+            term
+            and term not in VETERINARY_STOP_WORDS
+            and term not in structured_values
+        )
+    ]
+
+
+def _term_matches_text(search_term, text):
+    """
+    Match a term as a complete token instead of a loose substring.
+    """
+
+    pattern = (
+        r"(?<![A-Za-z0-9_])"
+        + re.escape(search_term)
+        + r"(?![A-Za-z0-9_])"
+    )
+
+    return re.search(
+        pattern,
+        text,
+        flags=re.IGNORECASE
+    ) is not None
+
+
 def search_veterinary_database(
     excel_path,
     search_query,
@@ -60,36 +144,15 @@ def search_veterinary_database(
 ):
     """
     Search the veterinary Guide sheet.
-
-    Parameters
-    ----------
-    excel_path : str
-        Path to the Excel workbook.
-
-    search_query : str
-        Free-text clinical query, such as:
-        "watery diarrhea dehydration"
-
-    structured_filters : dict or None
-        Optional hard filters, such as:
-        {
-            "host_species": "cattle"
-        }
-
-    Returns
-    -------
-    list of dict
-        Ranked veterinary entities with explainable scoring.
     """
 
     workbook = load_veterinary_database(excel_path)
     guide = workbook["Guide"]
 
-    search_terms = [
-        term.lower().strip()
-        for term in search_query.split()
-        if term.strip()
-    ]
+    search_terms = _clean_search_terms(
+        search_query,
+        structured_filters=structured_filters
+    )
 
     results = []
 
@@ -122,15 +185,14 @@ def search_veterinary_database(
             if text.lower() == "nan":
                 continue
 
-            text_lower = text.lower()
-
             for search_term in search_terms:
 
-                if search_term in text_lower:
-
+                if _term_matches_text(
+                    search_term,
+                    text
+                ):
                     matched_fields.add(field_name)
                     matched_terms.add(search_term)
-
                     weighted_score += field_weight
 
                     match_details.append(

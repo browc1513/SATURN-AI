@@ -70,6 +70,60 @@ def _steps_add(arguments, exact_result):
     ]
 
 
+def _steps_subtract(arguments, exact_result):
+    """
+    Generate steps for subtraction.
+    """
+
+    a = arguments.get("a")
+    b = arguments.get("b")
+
+    if a is None or b is None:
+        return None
+
+    return [
+        f"Subtract {b} from {a}.",
+        f"{a} - {b} = {exact_result}.",
+        f"Therefore, the result is {exact_result}."
+    ]
+
+
+def _steps_multiply(arguments, exact_result):
+    """
+    Generate steps for multiplication.
+    """
+
+    a = arguments.get("a")
+    b = arguments.get("b")
+
+    if a is None or b is None:
+        return None
+
+    return [
+        f"Multiply {a} by {b}.",
+        f"{a} * {b} = {exact_result}.",
+        f"Therefore, the result is {exact_result}."
+    ]
+
+
+def _steps_divide(arguments, exact_result):
+    """
+    Generate steps for division.
+    """
+
+    a = arguments.get("a")
+    b = arguments.get("b")
+
+    if a is None or b is None:
+        return None
+
+    return [
+        f"Divide {a} by {b}.",
+        f"{a} / {b} = {exact_result}.",
+        f"Therefore, the result is {exact_result}."
+    ]
+
+
 # ============================================================
 # ALGEBRA
 # ============================================================
@@ -316,6 +370,9 @@ def _steps_derivative(arguments, exact_result):
 
 STEP_GENERATORS = {
     "add": _steps_add,
+    "subtract": _steps_subtract,
+    "multiply": _steps_multiply,
+    "divide": _steps_divide,
     "solve_equation": _steps_solve_equation,
     "circle_area": _steps_circle_area,
     "sphere_volume": _steps_sphere_volume,

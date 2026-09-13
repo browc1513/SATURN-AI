@@ -2529,27 +2529,46 @@ def extract_semantic_arguments_for_operation(
 
         patterns = []
 
-        if operation_name in {
-            "add",
-            "multiply",
+        # Support both natural-language arithmetic and direct
+        # operator notation.  The direct forms intentionally
+        # stay limited to two plain numeric operands so this
+        # adapter does not steal symbolic algebra expressions.
+
+        if operation_name == "add":
+            patterns = [
+                rf"({NUMBER_PATTERN})\s*\+\s*({NUMBER_PATTERN})",
+                rf"\badd\s+({NUMBER_PATTERN})\s+(?:and|to)\s+"
+                rf"({NUMBER_PATTERN})\b",
+            ]
+
+        elif operation_name == "multiply":
+            patterns = [
+                rf"({NUMBER_PATTERN})\s*(?:\*|×)\s*({NUMBER_PATTERN})",
+                rf"\bmultiply\s+({NUMBER_PATTERN})\s+(?:and|by)\s+"
+                rf"({NUMBER_PATTERN})\b",
+            ]
+
+        elif operation_name in {
             "greatest_common_divisor",
             "least_common_multiple",
             "ratio",
         }:
             patterns = [
-                rf"\b(?:add|multiply|gcd|lcm|ratio(?:\s+of)?)\s+"
+                rf"\b(?:gcd|lcm|ratio(?:\s+of)?)\s+"
                 rf"({NUMBER_PATTERN})\s+(?:and|by|to)\s+"
                 rf"({NUMBER_PATTERN})\b",
             ]
 
         elif operation_name == "subtract":
             patterns = [
+                rf"({NUMBER_PATTERN})\s*-\s*({NUMBER_PATTERN})",
                 rf"\bsubtract\s+({NUMBER_PATTERN})\s+from\s+"
                 rf"({NUMBER_PATTERN})\b",
             ]
 
         elif operation_name == "divide":
             patterns = [
+                rf"({NUMBER_PATTERN})\s*(?:/|÷)\s*({NUMBER_PATTERN})",
                 rf"\bdivide\s+({NUMBER_PATTERN})\s+by\s+"
                 rf"({NUMBER_PATTERN})\b",
             ]
@@ -2572,11 +2591,20 @@ def extract_semantic_arguments_for_operation(
                     match.group(2)
                 )
 
-                if operation_name == "subtract":
+                if (
+                    operation_name == "subtract"
+                    and re.search(
+                        r"\bsubtract\b",
+                        match.group(0),
+                        flags=re.IGNORECASE,
+                    )
+                ):
                     # "subtract 4 from 10" => 10 - 4
                     result["a"] = second
                     result["b"] = first
                 else:
+                    # Direct notation such as "10 - 4" keeps
+                    # the operands in their written order.
                     result["a"] = first
                     result["b"] = second
 

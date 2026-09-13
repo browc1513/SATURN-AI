@@ -1,12 +1,6 @@
 import sys
 import os
 import tkinter as tk
-from tkinter import ttk
-
-import numpy as np
-from scipy.stats import norm
-from numpy.fft import fft, ifft
-from sympy import Matrix, sympify, pretty
 
 
 # Ensure project paths are accessible
@@ -24,193 +18,17 @@ from core.saturn_instance import get_saturn
 saturn = get_saturn("saturn_config.json")
 
 
-# ---------- Physics Imports ----------
-
-from physics_subsystems.forces_work_energy import (
-    force,
-    work,
-    power,
-    kinetic_energy,
-    potential_energy,
-    momentum,
-    impulse
-)
-
-from physics_subsystems.particle_systems import (
-    center_of_mass,
-    total_momentum,
-    collision_momentum,
-    impulse_momentum
-)
-
-
-from math_engine.math_pipeline import interpret_and_execute_math
-
-
-# ---------- Veterinary Imports ----------
-
-from veterinary_subsystem.clinical_search import (
-    search_veterinary_database,
-    format_veterinary_results
-)
-
-from veterinary_subsystem.database_loader import (
-    load_veterinary_database
-)
-
-
-# ============================================================
-# FILE PATHS
-# ============================================================
-
-VETERINARY_DATABASE_PATH = os.path.join(
-    PROJECT_ROOT,
-    "data",
-    "Pathophysiology Guide.xlsx"
-)
-
-
-# ============================================================
-# VETERINARY DATABASE HELPERS
-# ============================================================
-
-def get_species_options():
-    """
-    Read all unique species from the veterinary database.
-
-    Species stored in pipe-delimited form such as:
-        cattle|swine
-
-    are separated into individual dropdown options.
-    """
-
-    try:
-        workbook = load_veterinary_database(
-            VETERINARY_DATABASE_PATH
-        )
-
-        guide = workbook["Guide"]
-
-        species = set()
-
-        if "host_species" in guide.columns:
-
-            for value in guide["host_species"].dropna():
-
-                for item in str(value).split("|"):
-
-                    item = item.strip()
-
-                    if item:
-                        species.add(
-                            item.capitalize()
-                        )
-
-        return [
-            "Any Species",
-            *sorted(species)
-        ]
-
-    except Exception:
-        # Keep the GUI usable even if the workbook
-        # cannot be loaded during startup.
-        return [
-            "Any Species"
-        ]
-
-
 # ============================================================
 # GUI FUNCTIONS
 # ============================================================
 
-def _format_math_response(result):
+def submit_query(event=None):
     """
-    Convert a universal math-pipeline result into readable GUI text.
-    """
-
-    if not result.get("success"):
-
-        error = result.get(
-            "error",
-            "SATURN could not complete the math request."
-        )
-
-        stage = result.get("stage")
-
-        if stage:
-            return (
-                f"I couldn't complete that request.\n\n"
-                f"Stage: {stage}\n"
-                f"Error: {error}"
-            )
-
-        return (
-            f"I couldn't complete that request.\n\n"
-            f"Error: {error}"
-        )
-
-    lines = []
-
-    steps = result.get(
-        "steps",
-        []
-    )
-
-    for index, step in enumerate(
-        steps,
-        start=1,
-    ):
-        lines.append(
-            f"{index}. {step}"
-        )
-
-    exact_result = result.get(
-        "exact_result"
-    )
-
-    decimal_result = result.get(
-        "decimal_result"
-    )
-
-    if lines:
-        lines.append("")
-
-    lines.append(
-        f"Exact Answer: {exact_result}"
-    )
-
-    if (
-        decimal_result is not None
-        and str(decimal_result) != str(exact_result)
-    ):
-        lines.append(
-            f"Decimal Answer: {decimal_result}"
-        )
-
-    warnings = result.get(
-        "warnings",
-        []
-    )
-
-    if warnings:
-
-        lines.append("")
-
-        for warning in warnings:
-            lines.append(
-                f"Warning: {warning}"
-            )
-
-    return "\n".join(lines)
-
-
-def submit_math_query(event=None):
-    """
-    Send the user's natural-language math question through
-    SATURN's universal math pipeline and display the response.
+    Send the user's text directly to SATURN's central
+    Language User Interface.
     """
 
-    query = math_query_var.get().strip()
+    query = query_var.get().strip()
 
     if not query:
         return
@@ -219,16 +37,14 @@ def submit_math_query(event=None):
         f"\nYou:\n{query}\n"
     )
 
-    math_query_var.set("")
+    query_var.set("")
 
     try:
+        result = saturn.handle_query(query)
 
-        result = interpret_and_execute_math(
-            query
-        )
-
-        response = _format_math_response(
-            result
+        response = result.get(
+            "response",
+            "No response was generated."
         )
 
         update_chat(
@@ -236,99 +52,13 @@ def submit_math_query(event=None):
         )
 
     except Exception as error:
-
-        response = (
+        update_chat(
+            f"{saturn.name}:\n\n"
             f"Something went wrong while processing "
-            f"the math request:\n{error}"
+            f"your request:\n{error}\n"
         )
 
-        update_chat(
-            f"{saturn.name}:\n\n{response}\n"
-        )
-
-
-def submit_veterinary_query(event=None):
-    """
-    Search the veterinary database using clinical keywords
-    and an optional species filter.
-    """
-
-    query = veterinary_query_var.get().strip()
-
-    if not query:
-        return
-
-    selected_species = veterinary_species_var.get().strip()
-
-    structured_filters = None
-
-    if (
-        selected_species
-        and selected_species != "Any Species"
-    ):
-        structured_filters = {
-            "host_species": selected_species.lower()
-        }
-
-    if selected_species == "Any Species":
-        search_header = query
-
-    else:
-        search_header = (
-            f"{query}\n"
-            f"Species: {selected_species}"
-        )
-
-    update_chat(
-        f"\nVeterinary Search:\n"
-        f"{search_header}\n"
-    )
-
-    veterinary_query_var.set("")
-
-    try:
-
-        results = search_veterinary_database(
-            VETERINARY_DATABASE_PATH,
-            query,
-            structured_filters=structured_filters
-        )
-
-        response = format_veterinary_results(
-            results
-        )
-
-        update_chat(
-            f"{saturn.name} Veterinary Results:\n\n"
-            f"{response}\n"
-        )
-
-    except Exception as error:
-
-        response = (
-            f"Something went wrong while searching "
-            f"the veterinary database:\n{error}"
-        )
-
-        update_chat(
-            f"{saturn.name}:\n\n{response}\n"
-        )
-
-
-# ============================================================
-# MODE CONTROL
-# ============================================================
-
-def change_mode(event=None):
-
-    selected_mode = mode_var.get().lower()
-
-    saturn.set_mode(selected_mode)
-
-    update_chat(
-        f"{saturn.name} switched to "
-        f"{selected_mode.capitalize()} Mode."
-    )
+    query_entry.focus_set()
 
 
 # ============================================================
@@ -336,211 +66,35 @@ def change_mode(event=None):
 # ============================================================
 
 def update_chat(message):
-
-    chat_output.configure(
-        state="normal"
-    )
-
-    chat_output.insert(
-        tk.END,
-        message + "\n"
-    )
-
-    chat_output.configure(
-        state="disabled"
-    )
-
-    chat_output.see(
-        tk.END
-    )
+    chat_output.configure(state="normal")
+    chat_output.insert(tk.END, message + "\n")
+    chat_output.configure(state="disabled")
+    chat_output.see(tk.END)
 
 
 # ============================================================
 # APP INITIALIZATION
 # ============================================================
 
-saturn.react_to_task("math")
-
-
-# ============================================================
-# GUI SETUP
-# ============================================================
-
 root = tk.Tk()
 
-root.title(
-    "S.A.T.U.R.N. Physics, Math & Veterinary Assistant"
-)
+root.title("S.A.T.U.R.N.")
+root.geometry("900x650")
+root.minsize(650, 450)
 
 
 # ============================================================
-# MODE SWITCH
+# MAIN CONTAINER
 # ============================================================
 
-mode_var = tk.StringVar()
-
-mode_dropdown = ttk.Combobox(
+main_frame = tk.Frame(
     root,
-    textvariable=mode_var,
-    width=20
+    bg="#1e1e1e"
 )
 
-mode_dropdown["values"] = [
-    "Science",
-    "Creative",
-    "Chill"
-]
-
-mode_dropdown.set(
-    "Science"
-)
-
-mode_dropdown.grid(
-    row=0,
-    column=0,
-    padx=10,
-    pady=10
-)
-
-mode_dropdown.bind(
-    "<<ComboboxSelected>>",
-    change_mode
-)
-
-
-# ============================================================
-# NATURAL-LANGUAGE MATH QUERY
-# ============================================================
-
-math_query_var = tk.StringVar()
-
-math_query_label = tk.Label(
-    root,
-    text="Ask SATURN a math question:"
-)
-
-math_query_label.grid(
-    row=1,
-    column=0,
-    padx=10,
-    pady=(10, 5),
-    sticky="w"
-)
-
-math_query_entry = tk.Entry(
-    root,
-    textvariable=math_query_var,
-    width=70,
-    font=("Consolas", 11)
-)
-
-math_query_entry.grid(
-    row=1,
-    column=1,
-    padx=10,
-    pady=(10, 5),
-    sticky="ew"
-)
-
-ask_button = tk.Button(
-    root,
-    text="Ask SATURN",
-    command=submit_math_query
-)
-
-ask_button.grid(
-    row=1,
-    column=2,
-    padx=10,
-    pady=(10, 5)
-)
-
-math_query_entry.bind(
-    "<Return>",
-    submit_math_query
-)
-
-
-# ============================================================
-# VETERINARY KEYWORD SEARCH
-# ============================================================
-
-veterinary_query_var = tk.StringVar()
-
-veterinary_query_label = tk.Label(
-    root,
-    text="Veterinary keywords:"
-)
-
-veterinary_query_label.grid(
-    row=2,
-    column=0,
-    padx=10,
-    pady=5,
-    sticky="w"
-)
-
-veterinary_query_entry = tk.Entry(
-    root,
-    textvariable=veterinary_query_var,
-    width=70,
-    font=("Consolas", 11)
-)
-
-veterinary_query_entry.grid(
-    row=2,
-    column=1,
-    padx=10,
-    pady=5,
-    sticky="ew"
-)
-
-
-# ---------- Species Selector ----------
-
-veterinary_species_var = tk.StringVar()
-
-veterinary_species_dropdown = ttk.Combobox(
-    root,
-    textvariable=veterinary_species_var,
-    width=15,
-    state="readonly"
-)
-
-veterinary_species_dropdown["values"] = (
-    get_species_options()
-)
-
-veterinary_species_dropdown.set(
-    "Any Species"
-)
-
-veterinary_species_dropdown.grid(
-    row=2,
-    column=2,
-    padx=5,
-    pady=5
-)
-
-
-# ---------- Veterinary Search Button ----------
-
-veterinary_search_button = tk.Button(
-    root,
-    text="Search Vet DB",
-    command=submit_veterinary_query
-)
-
-veterinary_search_button.grid(
-    row=2,
-    column=3,
-    padx=10,
-    pady=5
-)
-
-veterinary_query_entry.bind(
-    "<Return>",
-    submit_veterinary_query
+main_frame.pack(
+    fill="both",
+    expand=True
 )
 
 
@@ -548,54 +102,118 @@ veterinary_query_entry.bind(
 # CHAT OUTPUT WINDOW
 # ============================================================
 
+chat_frame = tk.Frame(
+    main_frame,
+    bg="#1e1e1e"
+)
+
+chat_frame.pack(
+    fill="both",
+    expand=True,
+    padx=12,
+    pady=(12, 6)
+)
+
+chat_scrollbar = tk.Scrollbar(chat_frame)
+chat_scrollbar.pack(
+    side="right",
+    fill="y"
+)
+
 chat_output = tk.Text(
-    root,
-    height=20,
-    width=85,
+    chat_frame,
     state="disabled",
+    wrap="word",
     bg="#1e1e1e",
     fg="#d4d4d4",
-
-    # Monospaced font keeps matrices aligned
-    font=("Consolas", 10)
+    insertbackground="#ffffff",
+    font=("Consolas", 11),
+    padx=12,
+    pady=12,
+    relief="flat",
+    borderwidth=0,
+    yscrollcommand=chat_scrollbar.set
 )
 
-chat_output.grid(
-    row=3,
-    column=0,
-    columnspan=4,
-    padx=10,
-    pady=10,
-    sticky="nsew"
+chat_output.pack(
+    side="left",
+    fill="both",
+    expand=True
+)
+
+chat_scrollbar.configure(
+    command=chat_output.yview
 )
 
 
 # ============================================================
-# WINDOW SCALING
+# QUERY INPUT AREA
 # ============================================================
 
-root.grid_columnconfigure(
-    1,
-    weight=1
+input_frame = tk.Frame(
+    main_frame,
+    bg="#1e1e1e"
 )
 
-root.grid_rowconfigure(
-    3,
-    weight=1
+input_frame.pack(
+    fill="x",
+    padx=12,
+    pady=(6, 12)
+)
+
+query_var = tk.StringVar()
+
+query_entry = tk.Entry(
+    input_frame,
+    textvariable=query_var,
+    font=("Consolas", 12),
+    bg="#2d2d2d",
+    fg="#ffffff",
+    insertbackground="#ffffff",
+    relief="flat",
+    borderwidth=0
+)
+
+query_entry.pack(
+    side="left",
+    fill="x",
+    expand=True,
+    ipady=10,
+    padx=(0, 8)
+)
+
+send_button = tk.Button(
+    input_frame,
+    text="Send",
+    command=submit_query,
+    font=("Consolas", 11),
+    padx=18,
+    pady=8
+)
+
+send_button.pack(
+    side="right"
+)
+
+query_entry.bind(
+    "<Return>",
+    submit_query
 )
 
 
-# Start with the math field selected.
+# ============================================================
+# STARTUP MESSAGE
+# ============================================================
 
-math_query_entry.focus_set()
+update_chat(
+    f"{saturn.name} is online and ready."
+)
+
+query_entry.focus_set()
 
 
 # ============================================================
 # LAUNCH
 # ============================================================
-
-update_chat(
-    f"{saturn.name} is online and ready in Science Mode."
-)
 
 root.mainloop()
