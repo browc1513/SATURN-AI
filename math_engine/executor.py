@@ -79,7 +79,7 @@ def validate_arguments(function, arguments):
 
 def execute_math_operation(operation_name, arguments=None):
     """
-    Execute any registered NOVA math operation
+    Execute any registered SATURN math operation
     and return a standardized result dictionary.
     """
 

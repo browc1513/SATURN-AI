@@ -1,7 +1,7 @@
 """
-N.O.V.A. Arithmetic Subsystem
+S.A.T.U.R.N. Arithmetic Subsystem
 
-Provides core arithmetic operations for the N.O.V.A. math engine.
+Provides core arithmetic operations for the S.A.T.U.R.N. math engine.
 
 This subsystem uses SymPy so that calculations can preserve exact
 mathematical values such as fractions and radicals whenever possible.

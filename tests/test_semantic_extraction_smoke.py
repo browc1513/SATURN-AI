@@ -1,5 +1,5 @@
 """
-N.O.V.A. Semantic Extraction Smoke Test
+S.A.T.U.R.N. Semantic Extraction Smoke Test
 
 Purpose
 -------
@@ -122,7 +122,7 @@ def show_case(title, operation, text):
 
 def main():
     print("=" * 72)
-    print("N.O.V.A. Semantic Extraction Smoke Test")
+    print("S.A.T.U.R.N. Semantic Extraction Smoke Test")
     print("=" * 72)
 
     passed = 0

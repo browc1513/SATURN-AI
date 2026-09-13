@@ -1,8 +1,8 @@
 # ============================================================
-# N.O.V.A. LANGUAGE SCHEMA
+# S.A.T.U.R.N. LANGUAGE SCHEMA
 # ============================================================
 
-# This file defines how NOVA should interpret parameter names
+# This file defines how SATURN should interpret parameter names
 # found in registered deterministic math operations.
 #
 # It does NOT perform calculations.
@@ -307,7 +307,7 @@ BOOLEAN_PARAMETERS = {
 
 # Global parameter names are useful, but some names mean different
 # things in different deterministic operations. These overrides let
-# NOVA interpret a parameter according to the selected operation
+# SATURN interpret a parameter according to the selected operation
 # without creating one-off parsers for every function.
 OPERATION_PARAMETER_TYPE_OVERRIDES = {
     "absolute_extrema": {
@@ -369,7 +369,7 @@ def get_parameter_type(
     operation_name=None,
 ):
     """
-    Return NOVA's language interpretation type for a
+    Return SATURN's language interpretation type for a
     deterministic function parameter.
 
     When an operation name is supplied, operation-specific

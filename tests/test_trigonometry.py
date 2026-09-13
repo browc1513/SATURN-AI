@@ -1,5 +1,5 @@
 # ============================================================
-# N.O.V.A. TRIGONOMETRY TEST SUITE
+# S.A.T.U.R.N. TRIGONOMETRY TEST SUITE
 # ============================================================
 
 from sympy import (
@@ -151,7 +151,7 @@ from math_engine.trigonometry import (
 
 
 print("\n==============================")
-print("N.O.V.A. Trigonometry Test")
+print("S.A.T.U.R.N. Trigonometry Test")
 print("==============================")
 
 

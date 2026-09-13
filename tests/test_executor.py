@@ -4,7 +4,7 @@ from math_engine.executor import (
 
 
 print("\n==============================")
-print("N.O.V.A. Math Executor Test")
+print("S.A.T.U.R.N. Math Executor Test")
 print("==============================")
 
 

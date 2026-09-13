@@ -9,7 +9,7 @@ from math_engine.argument_extractor import (
 
 def interpret_and_execute_math(text):
     """
-    Run a natural-language math request through NOVA's
+    Run a natural-language math request through SATURN's
     complete deterministic math pipeline.
 
     Pipeline:
@@ -93,7 +93,7 @@ def interpret_and_execute_math(text):
     # ========================================================
     #
     # The router determines which mathematical operation the
-    # user is asking for before NOVA extracts operation-specific
+    # user is asking for before SATURN extracts operation-specific
     # arguments.
     # ========================================================
 
@@ -141,7 +141,7 @@ def interpret_and_execute_math(text):
     # STAGE 3 — OPERATION-DRIVEN UNIVERSAL ARGUMENT EXTRACTION
     # ========================================================
     #
-    # NOVA now knows the selected operation and can inspect that
+    # SATURN now knows the selected operation and can inspect that
     # function's real Python signature. The universal extractor
     # is the authoritative source of executable arguments.
     # ========================================================

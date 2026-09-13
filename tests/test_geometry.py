@@ -141,7 +141,7 @@ from math_engine.geometry import (
 
 
 print("\n==============================")
-print("N.O.V.A. Geometry Test")
+print("S.A.T.U.R.N. Geometry Test")
 print("==============================")
 
 

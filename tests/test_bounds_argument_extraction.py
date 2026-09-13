@@ -13,7 +13,7 @@ def show_test(title, value):
 
 def main():
     print("=" * 60)
-    print("N.O.V.A. Bounds / Interval Argument Extraction Test")
+    print("S.A.T.U.R.N. Bounds / Interval Argument Extraction Test")
     print("=" * 60)
 
     show_test(

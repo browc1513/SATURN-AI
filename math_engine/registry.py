@@ -1,9 +1,9 @@
 # ============================================================
-# N.O.V.A. MATH REGISTRY
+# S.A.T.U.R.N. MATH REGISTRY
 # ============================================================
 
 # ============================================================
-# N.O.V.A. MATH REGISTRY
+# S.A.T.U.R.N. MATH REGISTRY
 # ============================================================
 
 import inspect
@@ -211,7 +211,7 @@ from math_engine.geometry import (
 class MathRegistry:
     """
     Central catalogue of deterministic math operations
-    available to NOVA.
+    available to SATURN.
     """
 
     def __init__(self):
@@ -2480,7 +2480,7 @@ def register_trigonometry_operations(registry):
         # Only register functions actually defined in
         # trigonometry.py. This prevents imported SymPy
         # functions such as sin(), cos(), etc. from appearing
-        # in the NOVA registry.
+        # in the SATURN registry.
         if (
             function.__module__
             != trigonometry_module.__name__

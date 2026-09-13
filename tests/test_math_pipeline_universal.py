@@ -1,5 +1,5 @@
 """
-N.O.V.A. Universal Math Pipeline Regression Test
+S.A.T.U.R.N. Universal Math Pipeline Regression Test
 
 Purpose
 -------
@@ -36,7 +36,7 @@ def show_result(text, result):
 
 def main():
     print("=" * 72)
-    print("N.O.V.A. Universal Math Pipeline Regression Test")
+    print("S.A.T.U.R.N. Universal Math Pipeline Regression Test")
     print("=" * 72)
 
     passed = 0

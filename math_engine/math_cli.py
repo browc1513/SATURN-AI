@@ -4,10 +4,10 @@ from math_engine.math_pipeline import interpret_and_execute_math
 def print_header():
     print()
     print("=" * 44)
-    print("              N.O.V.A. MATH")
+    print("              S.A.T.U.R.N. MATH")
     print("=" * 44)
     print("Type a math question.")
-    print("Type 'exit' or 'quit' to close NOVA.")
+    print("Type 'exit' or 'quit' to close SATURN.")
     print()
 
 
@@ -19,7 +19,7 @@ def print_result(result):
 
     if not result["success"]:
 
-        print("\nNOVA:")
+        print("\nSATURN:")
 
         if result["error"]:
             print(f"Error: {result['error']}")
@@ -32,7 +32,7 @@ def print_result(result):
 
         return
 
-    print("\nNOVA:\n")
+    print("\nSATURN:\n")
 
     steps = result.get(
         "steps",
@@ -90,7 +90,7 @@ def print_result(result):
 
 def run_math_cli():
     """
-    Start NOVA's interactive terminal math interface.
+    Start SATURN's interactive terminal math interface.
     """
 
     print_header()
@@ -109,7 +109,7 @@ def run_math_cli():
         ):
 
             print(
-                "\n\nNOVA: Goodbye."
+                "\n\nSATURN: Goodbye."
             )
 
             break
@@ -120,7 +120,7 @@ def run_math_cli():
         ):
 
             print(
-                "\nNOVA: Goodbye."
+                "\nSATURN: Goodbye."
             )
 
             break
@@ -128,7 +128,7 @@ def run_math_cli():
         if not user_input:
 
             print(
-                "\nNOVA: Please enter a math question.\n"
+                "\nSATURN: Please enter a math question.\n"
             )
 
             continue

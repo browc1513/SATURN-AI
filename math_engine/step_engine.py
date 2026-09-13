@@ -83,7 +83,7 @@ def _steps_solve_equation(arguments, exact_result):
         right_side
         variable
 
-    NOVA does not invent intermediate algebraic transformations
+    SATURN does not invent intermediate algebraic transformations
     unless they were explicitly produced by a deterministic
     symbolic step solver.
     """
@@ -116,7 +116,7 @@ def _steps_solve_equation(arguments, exact_result):
 
     return [
         f"Start with the equation {equation}.",
-        f"Solve the equation for {variable} using NOVA's deterministic algebra solver.",
+        f"Solve the equation for {variable} using SATURN's deterministic algebra solver.",
         f"The solution set is {exact_result}.",
         f"Therefore, {solution_text}."
     ]
@@ -175,7 +175,7 @@ def _steps_direct_trig(arguments, exact_result, operation_name):
     Generate steps for direct trigonometric function evaluation.
 
     This generator does not calculate independently. It explains
-    the exact result already produced by NOVA's deterministic
+    the exact result already produced by SATURN's deterministic
     trigonometry subsystem.
     """
 
@@ -344,7 +344,7 @@ def generate_steps(
 ):
     """
     Generate human-readable mathematical solution steps for
-    a completed deterministic NOVA math operation.
+    a completed deterministic SATURN math operation.
 
     The Step Engine does not calculate the answer itself.
     It receives the already-computed exact result from the

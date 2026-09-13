@@ -1,5 +1,5 @@
 """
-Universal Extraction Coverage Test for N.O.V.A.
+Universal Extraction Coverage Test for S.A.T.U.R.N.
 
 This is intentionally stricter than the audit script.
 
@@ -25,7 +25,7 @@ from math_engine.registry import math_registry
 def main():
 
     print("=" * 68)
-    print("N.O.V.A. Universal Extraction Coverage Test")
+    print("S.A.T.U.R.N. Universal Extraction Coverage Test")
     print("=" * 68)
 
     operation_names = sorted(

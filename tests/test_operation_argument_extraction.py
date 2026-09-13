@@ -6,7 +6,7 @@ from math_engine.argument_extractor import (
 
 print()
 print("=" * 52)
-print("N.O.V.A. Operation Argument Extraction Test")
+print("S.A.T.U.R.N. Operation Argument Extraction Test")
 print("=" * 52)
 
 

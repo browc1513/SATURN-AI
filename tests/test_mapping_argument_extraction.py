@@ -11,7 +11,7 @@ def show_test(title, value):
 
 def main():
     print("=" * 60)
-    print("N.O.V.A. Mapping / Substitution Extraction Test")
+    print("S.A.T.U.R.N. Mapping / Substitution Extraction Test")
     print("=" * 60)
 
     show_test(

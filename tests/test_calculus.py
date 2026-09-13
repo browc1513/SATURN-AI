@@ -1,5 +1,5 @@
 # ============================================================
-# N.O.V.A. CALCULUS TEST SUITE
+# S.A.T.U.R.N. CALCULUS TEST SUITE
 # ============================================================
 
 from sympy import (
@@ -201,7 +201,7 @@ from math_engine.calculus import (
 
 
 print("\n==============================")
-print("N.O.V.A. Calculus Test")
+print("S.A.T.U.R.N. Calculus Test")
 print("==============================")
 
 

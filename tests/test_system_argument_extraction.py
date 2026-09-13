@@ -16,7 +16,7 @@ def show_test(label, value):
 
 
 print("=" * 60)
-print("N.O.V.A. System Argument Extraction Test")
+print("S.A.T.U.R.N. System Argument Extraction Test")
 print("=" * 60)
 
 

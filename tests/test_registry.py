@@ -2,7 +2,7 @@ from math_engine.registry import math_registry
 
 
 print("\n==============================")
-print("N.O.V.A. Math Registry Test")
+print("S.A.T.U.R.N. Math Registry Test")
 print("==============================")
 
 

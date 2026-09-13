@@ -12,7 +12,7 @@ def run_test(label, value):
 
 
 print("=" * 60)
-print("N.O.V.A. Expression / Variable Extraction Test")
+print("S.A.T.U.R.N. Expression / Variable Extraction Test")
 print("=" * 60)
 
 

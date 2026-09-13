@@ -1,7 +1,7 @@
 """
-N.O.V.A. Algebra Subsystem
+S.A.T.U.R.N. Algebra Subsystem
 
-Provides symbolic algebra operations for the N.O.V.A. math engine.
+Provides symbolic algebra operations for the S.A.T.U.R.N. math engine.
 
 This subsystem uses SymPy so expressions and solutions remain exact
 whenever possible.

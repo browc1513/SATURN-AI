@@ -29,7 +29,7 @@ PHRASE_REPLACEMENTS = {
 def normalize_math_language(text):
     """
     Normalize common mathematical language into forms that
-    are easier for NOVA's deterministic systems to process.
+    are easier for SATURN's deterministic systems to process.
 
     This function does not perform any mathematics.
     """
@@ -444,7 +444,7 @@ def build_router_query(
 def interpret_math_request(text):
     """
     Convert a natural-language math request into a
-    structured NOVA math request.
+    structured SATURN math request.
 
     The interpreter does not perform mathematics and does
     not directly select or execute a registry operation.

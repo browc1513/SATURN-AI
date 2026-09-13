@@ -4,7 +4,7 @@ from math_engine.router import select_math_operation
 
 print()
 print("=" * 52)
-print("N.O.V.A. Route-First Test")
+print("S.A.T.U.R.N. Route-First Test")
 print("=" * 52)
 
 

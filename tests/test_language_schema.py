@@ -5,7 +5,7 @@ from math_engine.language_schema import (
 
 
 print("\n==============================")
-print("N.O.V.A. Language Schema Test")
+print("S.A.T.U.R.N. Language Schema Test")
 print("==============================")
 
 

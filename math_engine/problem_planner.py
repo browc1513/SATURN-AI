@@ -1,5 +1,5 @@
 """
-N.O.V.A. Problem Planner v1.3
+S.A.T.U.R.N. Problem Planner v1.3
 
 Fixes in v1.3
 -------------

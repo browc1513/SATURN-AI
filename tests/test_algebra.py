@@ -42,7 +42,7 @@ from math_engine.algebra import (
 
 
 print("\n==============================")
-print("N.O.V.A. Algebra Test")
+print("S.A.T.U.R.N. Algebra Test")
 print("==============================\n")
 
 

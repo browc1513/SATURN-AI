@@ -1,5 +1,5 @@
 """
-N.O.V.A. Problem Planner v1 Test
+S.A.T.U.R.N. Problem Planner v1 Test
 
 Run:
     python -m tests.test_problem_planner
@@ -17,7 +17,7 @@ def main():
     )
 
     print("=" * 72)
-    print("N.O.V.A. Problem Planner v1 Test")
+    print("S.A.T.U.R.N. Problem Planner v1 Test")
     print("=" * 72)
     print("Input:", text)
 

@@ -4,7 +4,7 @@ from math_engine.math_pipeline import (
 
 
 print("\n==============================")
-print("N.O.V.A. Natural Language Math Pipeline Test")
+print("S.A.T.U.R.N. Natural Language Math Pipeline Test")
 print("==============================")
 
 

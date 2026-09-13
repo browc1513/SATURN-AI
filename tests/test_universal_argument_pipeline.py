@@ -15,7 +15,7 @@ TESTS = [
 
 
 print("=" * 60)
-print("N.O.V.A. Universal Argument Pipeline Test")
+print("S.A.T.U.R.N. Universal Argument Pipeline Test")
 print("=" * 60)
 
 

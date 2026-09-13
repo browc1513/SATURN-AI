@@ -17,11 +17,11 @@ PROJECT_ROOT = os.path.abspath(
 sys.path.append(PROJECT_ROOT)
 
 
-# ---------- Import N.O.V.A. ----------
+# ---------- Import S.A.T.U.R.N. ----------
 
-from core.nova_instance import get_nova
+from core.saturn_instance import get_saturn
 
-nova = get_nova("nova_config.json")
+saturn = get_saturn("saturn_config.json")
 
 
 # ---------- Physics Imports ----------
@@ -43,27 +43,6 @@ from physics_subsystems.particle_systems import (
     impulse_momentum
 )
 
-
-# ---------- Math Imports ----------
-
-from math_engine.math_engine import (
-    add,
-    subtract,
-    multiply,
-    divide,
-    differentiate,
-    integrate,
-    matrix_multiply,
-    matrix_inverse,
-    matrix_determinant,
-    matrix_eigenvalues,
-    matrix_rref,
-    compute_mean,
-    compute_std,
-    normal_distribution,
-    fourier_transform,
-    inverse_fourier_transform
-)
 
 from math_engine.math_pipeline import interpret_and_execute_math
 
@@ -153,7 +132,7 @@ def _format_math_response(result):
 
         error = result.get(
             "error",
-            "NOVA could not complete the math request."
+            "SATURN could not complete the math request."
         )
 
         stage = result.get("stage")
@@ -228,7 +207,7 @@ def _format_math_response(result):
 def submit_math_query(event=None):
     """
     Send the user's natural-language math question through
-    NOVA's universal math pipeline and display the response.
+    SATURN's universal math pipeline and display the response.
     """
 
     query = math_query_var.get().strip()
@@ -253,7 +232,7 @@ def submit_math_query(event=None):
         )
 
         update_chat(
-            f"{nova.name}:\n\n{response}\n"
+            f"{saturn.name}:\n\n{response}\n"
         )
 
     except Exception as error:
@@ -264,7 +243,7 @@ def submit_math_query(event=None):
         )
 
         update_chat(
-            f"{nova.name}:\n\n{response}\n"
+            f"{saturn.name}:\n\n{response}\n"
         )
 
 
@@ -320,7 +299,7 @@ def submit_veterinary_query(event=None):
         )
 
         update_chat(
-            f"{nova.name} Veterinary Results:\n\n"
+            f"{saturn.name} Veterinary Results:\n\n"
             f"{response}\n"
         )
 
@@ -332,7 +311,7 @@ def submit_veterinary_query(event=None):
         )
 
         update_chat(
-            f"{nova.name}:\n\n{response}\n"
+            f"{saturn.name}:\n\n{response}\n"
         )
 
 
@@ -344,10 +323,10 @@ def change_mode(event=None):
 
     selected_mode = mode_var.get().lower()
 
-    nova.set_mode(selected_mode)
+    saturn.set_mode(selected_mode)
 
     update_chat(
-        f"{nova.name} switched to "
+        f"{saturn.name} switched to "
         f"{selected_mode.capitalize()} Mode."
     )
 
@@ -380,7 +359,7 @@ def update_chat(message):
 # APP INITIALIZATION
 # ============================================================
 
-nova.react_to_task("math")
+saturn.react_to_task("math")
 
 
 # ============================================================
@@ -390,7 +369,7 @@ nova.react_to_task("math")
 root = tk.Tk()
 
 root.title(
-    "N.O.V.A. Physics, Math & Veterinary Assistant"
+    "S.A.T.U.R.N. Physics, Math & Veterinary Assistant"
 )
 
 
@@ -437,7 +416,7 @@ math_query_var = tk.StringVar()
 
 math_query_label = tk.Label(
     root,
-    text="Ask NOVA a math question:"
+    text="Ask SATURN a math question:"
 )
 
 math_query_label.grid(
@@ -465,7 +444,7 @@ math_query_entry.grid(
 
 ask_button = tk.Button(
     root,
-    text="Ask NOVA",
+    text="Ask SATURN",
     command=submit_math_query
 )
 
@@ -616,7 +595,7 @@ math_query_entry.focus_set()
 # ============================================================
 
 update_chat(
-    f"{nova.name} is online and ready in Science Mode."
+    f"{saturn.name} is online and ready in Science Mode."
 )
 
 root.mainloop()

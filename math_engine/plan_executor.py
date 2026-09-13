@@ -1,5 +1,5 @@
 """
-N.O.V.A. Plan Executor v1
+S.A.T.U.R.N. Plan Executor v1
 
 Purpose
 -------

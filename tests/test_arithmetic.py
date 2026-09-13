@@ -24,7 +24,7 @@ from math_engine.arithmetic import (
 
 
 print("\n==============================")
-print("N.O.V.A. Arithmetic Test")
+print("S.A.T.U.R.N. Arithmetic Test")
 print("==============================\n")
 
 

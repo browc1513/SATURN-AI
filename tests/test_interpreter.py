@@ -6,7 +6,7 @@ from math_engine.interpreter import (
 
 
 print("\n==============================")
-print("N.O.V.A. Language Interpreter Test")
+print("S.A.T.U.R.N. Language Interpreter Test")
 print("==============================")
 
 

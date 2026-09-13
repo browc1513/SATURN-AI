@@ -4,7 +4,7 @@ from math_engine.step_engine import generate_steps
 
 
 print("\n==============================")
-print("N.O.V.A. Step Engine Test")
+print("S.A.T.U.R.N. Step Engine Test")
 print("==============================")
 
 

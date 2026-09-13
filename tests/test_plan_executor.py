@@ -1,5 +1,5 @@
 """
-N.O.V.A. Plan Executor v1 Test
+S.A.T.U.R.N. Plan Executor v1 Test
 
 Run:
     python -m tests.test_plan_executor
@@ -22,7 +22,7 @@ def main():
     )
 
     print("=" * 72)
-    print("N.O.V.A. Plan Executor v1 Test")
+    print("S.A.T.U.R.N. Plan Executor v1 Test")
     print("=" * 72)
     print("Input:", text)
 

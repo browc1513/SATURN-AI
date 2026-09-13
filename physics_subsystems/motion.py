@@ -1,20 +1,20 @@
 import numpy as np
 from math_engine import *
-from core.nova_instance import get_nova
+from core.saturn_instance import get_saturn
 
-nova = get_nova("nova_config.json")
+saturn = get_saturn("saturn_config.json")
 
 def displacement(v0, a, t):
     """Computes displacement using s = v0*t + (1/2)*a*t^2"""
-    nova.speak("Calculating displacement. Motion in progress—no speed limit violations, please.")
+    saturn.speak("Calculating displacement. Motion in progress—no speed limit violations, please.")
     return v0 * t + 0.5 * a * (t ** 2)
 
 def final_velocity(v0, a, t):
     """Computes final velocity using v = v0 + a*t"""
-    nova.speak("Solving for final velocity. Let’s see where we end up.")
+    saturn.speak("Solving for final velocity. Let’s see where we end up.")
     return v0 + a * t
 
 def velocity_squared(v0, a, s):
     """Computes velocity using v^2 = v0^2 + 2*a*s"""
-    nova.speak("Computing velocity from distance—kinematics style.")
+    saturn.speak("Computing velocity from distance—kinematics style.")
     return np.sqrt(v0 ** 2 + 2 * a * s)

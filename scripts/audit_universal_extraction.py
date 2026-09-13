@@ -1,5 +1,5 @@
 """
-Universal Extraction Coverage Audit for N.O.V.A.
+Universal Extraction Coverage Audit for S.A.T.U.R.N.
 
 Purpose
 -------
@@ -289,7 +289,7 @@ def print_audit(audit):
     summary = audit["summary"]
 
     print("=" * 68)
-    print("N.O.V.A. Universal Extraction Coverage Audit")
+    print("S.A.T.U.R.N. Universal Extraction Coverage Audit")
     print("=" * 68)
 
     print(

@@ -283,7 +283,7 @@ def analyze_signature(function):
 
 def audit_registry():
     """
-    Inspect every registered NOVA math operation.
+    Inspect every registered SATURN math operation.
     """
 
     audit = []
@@ -498,7 +498,7 @@ def print_summary(audit):
 
     print()
     print("=" * 60)
-    print("N.O.V.A. MATH REGISTRY AUDIT")
+    print("S.A.T.U.R.N. MATH REGISTRY AUDIT")
     print("=" * 60)
 
     print(

@@ -15,7 +15,7 @@ def show_test(title, value):
 
 def main():
     print("=" * 60)
-    print("N.O.V.A. Coordinate Adapter / Override Test")
+    print("S.A.T.U.R.N. Coordinate Adapter / Override Test")
     print("=" * 60)
 
     # --------------------------------------------------------

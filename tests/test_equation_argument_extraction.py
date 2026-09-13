@@ -12,7 +12,7 @@ def show_test(label, value):
 
 
 print("=" * 60)
-print("N.O.V.A. Equation Argument Extraction Test")
+print("S.A.T.U.R.N. Equation Argument Extraction Test")
 print("=" * 60)
 
 

@@ -19,17 +19,13 @@ TEXT_EXTENSIONS = {
     ".csv",
 }
 
-REPLACEMENTS = [
-    ("get_nova", "get_saturn"),
-    ("NOVA", "SATURN"),
-    ("nova", "saturn"),
-]
+RENAME_TARGETS = {}
 
 RENAME_TARGETS = {
-    "nova_config.json": "saturn_config.json",
-    "nova_instance.py": "saturn_instance.py",
-    "nova_personality.py": "saturn_personality.py",
-    "nova_gui.py": "saturn_gui.py",
+    "saturn_config.json": "saturn_config.json",
+    "saturn_instance.py": "saturn_instance.py",
+    "saturn_personality.py": "saturn_personality.py",
+    "saturn_gui.py": "saturn_gui.py",
 }
 
 
@@ -37,23 +33,8 @@ def should_skip(path: Path) -> bool:
     return any(part in SKIP_DIRS for part in path.parts)
 
 
-def preview_file_renames():
-    print("\n=== FILE RENAME PREVIEW ===")
-
-    for path in PROJECT_ROOT.rglob("*"):
-        if should_skip(path):
-            continue
-
-        if path.is_file() and path.name in RENAME_TARGETS:
-            new_name = RENAME_TARGETS[path.name]
-            new_path = path.with_name(new_name)
-
-            print(f"{path.relative_to(PROJECT_ROOT)}")
-            print(f"  -> {new_path.relative_to(PROJECT_ROOT)}")
-
-
-def preview_text_replacements():
-    print("\n=== TEXT REPLACEMENT PREVIEW ===")
+def replace_text_in_files():
+    print("\n=== UPDATING FILE CONTENTS ===")
 
     for path in PROJECT_ROOT.rglob("*"):
         if should_skip(path):
@@ -76,18 +57,47 @@ def preview_text_replacements():
             updated_text = updated_text.replace(old, new)
 
         if updated_text != original_text:
-            print(path.relative_to(PROJECT_ROOT))
+            path.write_text(updated_text, encoding="utf-8")
+            print(f"Updated: {path.relative_to(PROJECT_ROOT)}")
+
+
+def rename_files():
+    print("\n=== RENAMING FILES ===")
+
+    paths_to_rename = []
+
+    for path in PROJECT_ROOT.rglob("*"):
+        if should_skip(path):
+            continue
+
+        if path.is_file() and path.name in RENAME_TARGETS:
+            paths_to_rename.append(path)
+
+    for path in paths_to_rename:
+        new_name = RENAME_TARGETS[path.name]
+        new_path = path.with_name(new_name)
+
+        if new_path.exists():
+            raise FileExistsError(
+                f"Cannot rename {path} because {new_path} already exists."
+            )
+
+        path.rename(new_path)
+
+        print(
+            f"Renamed: {path.relative_to(PROJECT_ROOT)}"
+            f" -> {new_path.relative_to(PROJECT_ROOT)}"
+        )
 
 
 def main():
-    print("SATURN migration dry run")
+    print("Starting SATURN -> SATURN migration")
     print(f"Project root: {PROJECT_ROOT}")
 
-    preview_file_renames()
-    preview_text_replacements()
+    replace_text_in_files()
+    rename_files()
 
-    print("\nDRY RUN COMPLETE")
-    print("No files were changed.")
+    print("\nMIGRATION COMPLETE")
 
 
 if __name__ == "__main__":

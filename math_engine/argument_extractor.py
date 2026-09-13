@@ -645,7 +645,7 @@ def _equation_to_zero_expression(equation):
 
         (x + y) - (5)
 
-    This matches the input format expected by NOVA's
+    This matches the input format expected by SATURN's
     deterministic system-solving functions.
     """
 
@@ -691,7 +691,7 @@ def extract_equation_list(
     Extract multiple equations from a natural-language
     system-of-equations request.
 
-    Each equation is converted to NOVA's system-solver
+    Each equation is converted to SATURN's system-solver
     representation:
 
         left = right
@@ -1590,7 +1590,7 @@ def extract_list(
         side lengths [3, 4, 5]
         points [(0, 0), (4, 0), (4, 3)]
 
-    For recognized component/list parameters, NOVA also accepts
+    For recognized component/list parameters, SATURN also accepts
     parenthesized component sequences such as:
 
         components (3, 4)
@@ -1820,7 +1820,7 @@ def _normalize_option_value(value):
 
     This intentionally does not perform mathematical calculation.
     It only converts common natural-language option spellings into
-    deterministic values expected by NOVA's math subsystems.
+    deterministic values expected by SATURN's math subsystems.
     """
 
     value = _clean_extracted_text(
@@ -2721,7 +2721,7 @@ def extract_argument(
     operation_name=None,
 ):
     """
-    Extract one argument according to NOVA's language schema.
+    Extract one argument according to SATURN's language schema.
 
     Supported Interpreter v2 argument types currently include:
 
@@ -3020,7 +3020,7 @@ def extract_arguments_for_operation(
     Extract natural-language arguments for a registered
     deterministic math operation.
 
-    NOVA uses the operation's real Python signature to
+    SATURN uses the operation's real Python signature to
     determine what parameters should be searched for.
     """
 
@@ -3130,7 +3130,7 @@ def extract_arguments_for_operation(
                     parameter_name
                 )
 
-            # NOVA does not yet know how to interpret this
+            # SATURN does not yet know how to interpret this
             # parameter type.
             else:
 

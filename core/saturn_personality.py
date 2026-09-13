@@ -2,21 +2,21 @@ import json
 import random
 import os
 
-class NOVA:
-    def __init__(self, config_path="nova_config.json"):
-        self.name = "N.O.V.A."
+class SATURN:
+    def __init__(self, config_path="saturn_config.json"):
+        self.name = "S.A.T.U.R.N."
         self.mode = "science"
         self.voice_enabled = False  # You can add TTS later
         self.load_config(config_path)
 
     def load_config(self, config_path):
         if not os.path.exists(config_path):
-            raise FileNotFoundError(f"N.O.V.A. config not found at: {config_path}")
+            raise FileNotFoundError(f"S.A.T.U.R.N. config not found at: {config_path}")
         
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
 
-        self.name = config.get("name", "N.O.V.A.")
+        self.name = config.get("name", "S.A.T.U.R.N.")
         self.mode = config.get("mode", "science")
         self.personality_traits = config.get("personality_traits", {})
         self.references = config.get("pop_culture_references", {})

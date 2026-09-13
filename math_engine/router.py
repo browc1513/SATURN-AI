@@ -8,7 +8,7 @@ from math_engine.executor import execute_math_operation
 def _requested_result_score(query, operation_name):
     """
     Give extra routing weight to the quantity the user
-    appears to be asking NOVA to calculate.
+    appears to be asking SATURN to calculate.
 
     Example:
 
@@ -387,7 +387,7 @@ def find_math_operations(
     arguments=None
 ):
     """
-    Find likely NOVA math operations based on a text query.
+    Find likely SATURN math operations based on a text query.
 
     This function does not automatically execute anything.
     It searches the registry and returns ranked candidate
@@ -751,7 +751,7 @@ def route_and_execute_math(
 ):
     """
     Route a math request to a registered operation
-    and execute it through NOVA's standardized executor.
+    and execute it through SATURN's standardized executor.
     """
 
     arguments = arguments or {}

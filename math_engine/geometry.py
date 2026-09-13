@@ -1,7 +1,7 @@
 """
-N.O.V.A. Geometry Subsystem
+S.A.T.U.R.N. Geometry Subsystem
 
-Provides geometric calculations for the N.O.V.A. math engine.
+Provides geometric calculations for the S.A.T.U.R.N. math engine.
 
 This subsystem uses SymPy so geometric calculations can preserve
 exact mathematical values such as pi, fractions, and radicals
