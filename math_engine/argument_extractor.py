@@ -2422,15 +2422,15 @@ def _extract_direct_trig_arguments(
     """
 
     operation_aliases = {
-        "sine": ("sin",),
-        "cosine": ("cos",),
-        "tangent": ("tan",),
-        "secant": ("sec",),
-        "cosecant": ("csc",),
-        "cotangent": ("cot",),
-        "arcsine": ("asin", "arcsin"),
-        "arccosine": ("acos", "arccos"),
-        "arctangent": ("atan", "arctan"),
+        "sine": ("sine", "sin"),
+        "cosine": ("cosine", "cos"),
+        "tangent": ("tangent", "tan"),
+        "secant": ("secant", "sec"),
+        "cosecant": ("cosecant", "csc"),
+        "cotangent": ("cotangent", "cot"),
+        "arcsine": ("arcsine", "asin", "arcsin"),
+        "arccosine": ("arccosine", "acos", "arccos"),
+        "arctangent": ("arctangent", "atan", "arctan"),
     }
 
     aliases = operation_aliases.get(
@@ -2471,6 +2471,33 @@ def _extract_direct_trig_arguments(
         str(text),
         flags=re.IGNORECASE,
     )
+
+    # Also support natural-language direct trig requests:
+    #
+    #     sine of pi/6
+    #     cosine of pi/3
+    #     tangent of 45
+    #     arcsine of 1/2
+    #
+    # Keep the accepted value deliberately narrow so this adapter
+    # does not steal full trig equations or larger expressions.
+
+    if match is None:
+
+        scalar_pattern = (
+            r"[+\-]?(?:"
+            r"\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?"
+            r"|(?:\d+(?:\.\d+)?\s*\*\s*)?"
+            r"pi(?:\s*/\s*\d+(?:\.\d+)?)?"
+            r")"
+        )
+
+        match = re.search(
+            rf"\b(?:{alias_pattern})\b\s+(?:of\s+)?"
+            rf"({scalar_pattern})",
+            str(text),
+            flags=re.IGNORECASE,
+        )
 
     if match is None:
         return {}

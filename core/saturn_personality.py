@@ -338,8 +338,11 @@ class SATURN:
             "tan",
             "tangent",
             "arcsin",
+            "arcsine",
             "arccos",
+            "arccosine",
             "arctan",
+            "arctangent",
 
             # Linear algebra
             "matrix",

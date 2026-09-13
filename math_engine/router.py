@@ -53,10 +53,17 @@ def _requested_result_score(query, operation_name):
 
         patterns = [
             f"what is the {term}",
+            f"what is its {term}",
+            f"what's the {term}",
+            f"what's its {term}",
             f"find the {term}",
+            f"find its {term}",
             f"calculate the {term}",
+            f"calculate its {term}",
             f"determine the {term}",
+            f"determine its {term}",
             f"compute the {term}",
+            f"compute its {term}",
         ]
 
         if any(

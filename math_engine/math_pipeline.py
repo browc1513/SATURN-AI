@@ -144,11 +144,19 @@ def interpret_and_execute_math(text):
     # SATURN now knows the selected operation and can inspect that
     # function's real Python signature. The universal extractor
     # is the authoritative source of executable arguments.
+    #
+    # IMPORTANT:
+    # Use the normalized routing query here rather than the original
+    # user text. This allows language normalization such as:
+    #
+    #     "pi over 6" -> "pi/6"
+    #
+    # to be consumed by the deterministic argument extractor.
     # ========================================================
 
     argument_extraction = (
         extract_arguments_for_operation(
-            text,
+            routing_query,
             operation_name
         )
     )
@@ -226,7 +234,7 @@ def interpret_and_execute_math(text):
         result["routing_execution"] = {
             "success": False,
             "stage": "argument_extraction",
-            "query": interpretation["query"],
+            "query": routing_query,
             "operation": operation_name,
             "routing": routing,
             "execution": None,
@@ -253,7 +261,7 @@ def interpret_and_execute_math(text):
             if execution["success"]
             else "execution"
         ),
-        "query": interpretation["query"],
+        "query": routing_query,
         "operation": operation_name,
         "routing": routing,
         "execution": execution,

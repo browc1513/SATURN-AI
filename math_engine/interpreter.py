@@ -49,6 +49,42 @@ def normalize_math_language(text):
             replacement
         )
 
+    # --------------------------------------------------------
+    # NATURAL-LANGUAGE FRACTIONS
+    # --------------------------------------------------------
+    #
+    # Keep "over" contextual rather than replacing every use of
+    # the word globally. This protects unrelated mathematical
+    # phrases while supporting common spoken forms such as:
+    #
+    #     pi over 6       -> pi/6
+    #     2 pi over 3     -> 2*pi/3
+    #     1 over 2        -> 1/2
+    # --------------------------------------------------------
+
+    text = re.sub(
+        r"\b(-?\d+(?:\.\d+)?)\s+pi\s+over\s+"
+        r"(-?\d+(?:\.\d+)?)\b",
+        r"\1*pi/\2",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    text = re.sub(
+        r"\bpi\s+over\s+(-?\d+(?:\.\d+)?)\b",
+        r"pi/\1",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    text = re.sub(
+        r"\b(-?\d+(?:\.\d+)?)\s+over\s+"
+        r"(-?\d+(?:\.\d+)?)\b",
+        r"\1/\2",
+        text,
+        flags=re.IGNORECASE,
+    )
+
     # Normalize repeated whitespace.
     text = re.sub(
         r"\s+",
@@ -113,6 +149,12 @@ SUBSYSTEM_KEYWORDS = {
         "sin",
         "cos",
         "tan",
+        "arcsine",
+        "arccosine",
+        "arctangent",
+        "arcsin",
+        "arccos",
+        "arctan",
         "angle",
         "trigonometry",
         "trig",
@@ -143,6 +185,40 @@ def detect_subsystem(text):
     """
 
     text = str(text)
+
+    # --------------------------------------------------------
+    # EXPLICIT TRIGONOMETRY INTENT
+    # --------------------------------------------------------
+    #
+    # Normalization can turn:
+    #
+    #     "arcsine of 1 over 2"
+    #
+    # into:
+    #
+    #     "arcsine of 1/2"
+    #
+    # The slash is arithmetic notation, but the requested operation
+    # is still trigonometric. Explicit trig language therefore takes
+    # precedence over direct arithmetic-symbol detection.
+    # --------------------------------------------------------
+
+    trig_intent_pattern = (
+        r"\b(?:"
+        r"sine|cosine|tangent|secant|cosecant|cotangent|"
+        r"sin|cos|tan|sec|csc|cot|"
+        r"arcsine|arccosine|arctangent|"
+        r"arcsin|arccos|arctan|"
+        r"trigonometry|trig"
+        r")\b"
+    )
+
+    if re.search(
+        trig_intent_pattern,
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return "trigonometry"
 
     # --------------------------------------------------------
     # DIRECT ARITHMETIC SYMBOLS
