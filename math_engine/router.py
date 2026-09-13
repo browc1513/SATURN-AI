@@ -183,6 +183,203 @@ def _argument_compatibility_score(
     return score
 
 
+
+def _equation_structure_score(query, operation_name):
+    """
+    Score equation-solving operations using structural clues
+    present in the user's language.
+
+    This helps distinguish a normal equation such as:
+
+        solve 3*x + 5 = 20 for x
+
+    from systems, inequalities, logarithmic equations,
+    exponential equations, absolute-value equations, etc.
+    """
+
+    text = str(query).lower()
+    operation_name = str(operation_name).lower()
+
+    # --------------------------------------------------------
+    # DETECT BROAD MATHEMATICAL STRUCTURES
+    # --------------------------------------------------------
+
+    has_equals = "=" in text
+
+    has_inequality = any(
+        symbol in text
+        for symbol in (
+            "<=",
+            ">=",
+            "≤",
+            "≥",
+            "<",
+            ">",
+        )
+    )
+
+    has_system_cue = any(
+        cue in text
+        for cue in (
+            "system",
+            "simultaneous",
+            ";",
+            "\n",
+        )
+    )
+
+    has_log_cue = any(
+        cue in text
+        for cue in (
+            "log(",
+            "ln(",
+            "logarithm",
+            "logarithmic",
+        )
+    )
+
+    has_exponential_cue = any(
+        cue in text
+        for cue in (
+            "exponential",
+            "^x",
+            "**x",
+        )
+    )
+
+    has_absolute_value_cue = any(
+        cue in text
+        for cue in (
+            "absolute value",
+            "abs(",
+        )
+    )
+
+    has_piecewise_cue = "piecewise" in text
+
+    # --------------------------------------------------------
+    # ORDINARY SINGLE-EQUATION SOLVE
+    # --------------------------------------------------------
+
+    is_plain_equation = (
+        "solve" in text
+        and has_equals
+        and not has_inequality
+        and not has_system_cue
+        and not has_log_cue
+        and not has_exponential_cue
+        and not has_absolute_value_cue
+        and not has_piecewise_cue
+    )
+
+    if is_plain_equation:
+
+        if operation_name == "solve_equation":
+            return 25
+
+        if operation_name in (
+            "solve_system",
+            "solve_system_advanced",
+            "solve_inequality",
+            "solve_exponential",
+            "solve_logarithmic",
+            "solve_absolute_value",
+            "solve_piecewise",
+        ):
+            return -15
+
+    # --------------------------------------------------------
+    # STRUCTURAL PENALTIES FOR CLEARLY MISMATCHED SOLVERS
+    # --------------------------------------------------------
+
+    if has_inequality and operation_name == "solve_equation":
+        return -10
+
+    if has_system_cue and operation_name == "solve_equation":
+        return -10
+
+    return 0
+
+
+def _direct_trig_function_score(query, operation_name):
+    """
+    Score direct trigonometric function evaluations.
+
+    Examples:
+        sin(pi/6)   -> sine
+        cos(pi/3)   -> cosine
+        tan(pi/4)   -> tangent
+        asin(1/2)   -> arcsine
+
+    This scorer is intentionally disabled for equation-solving
+    requests so that expressions such as "solve sin(x) = 1/2"
+    remain available to trig-equation solvers.
+    """
+
+    text = str(query).strip().lower()
+    operation_name = str(operation_name).lower()
+
+    if (
+        "solve" in text
+        or "=" in text
+        or any(
+            symbol in text
+            for symbol in ("<=", ">=", "≤", "≥", "<", ">")
+        )
+    ):
+        return 0
+
+    trig_aliases = {
+        "sine": ("sin",),
+        "cosine": ("cos",),
+        "tangent": ("tan",),
+        "secant": ("sec",),
+        "cosecant": ("csc",),
+        "cotangent": ("cot",),
+        "arcsine": ("asin", "arcsin"),
+        "arccosine": ("acos", "arccos"),
+        "arctangent": ("atan", "arctan"),
+    }
+
+    detected_operation = None
+
+    ordered_operations = (
+        "arcsine",
+        "arccosine",
+        "arctangent",
+        "sine",
+        "cosine",
+        "tangent",
+        "secant",
+        "cosecant",
+        "cotangent",
+    )
+
+    for target_operation in ordered_operations:
+
+        for alias in trig_aliases[target_operation]:
+
+            if re.search(
+                rf"\b{re.escape(alias)}\s*\(",
+                text
+            ):
+                detected_operation = target_operation
+                break
+
+        if detected_operation is not None:
+            break
+
+    if detected_operation is None:
+        return 0
+
+    if operation_name == detected_operation:
+        return 50
+
+    if operation_name in trig_aliases:
+        return -20
+
+    return -15
+
 def find_math_operations(
     query,
     subsystem=None,
@@ -386,6 +583,24 @@ def find_math_operations(
         score += _argument_compatibility_score(
             operation,
             arguments
+        )
+
+        # ----------------------------------------------------
+        # EQUATION STRUCTURE / SOLVER INTENT
+        # ----------------------------------------------------
+
+        score += _equation_structure_score(
+            query,
+            operation["name"]
+        )
+
+        # ----------------------------------------------------
+        # DIRECT TRIG FUNCTION EVALUATION
+        # ----------------------------------------------------
+
+        score += _direct_trig_function_score(
+            query,
+            operation["name"]
         )
 
         # ----------------------------------------------------

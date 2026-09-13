@@ -2402,6 +2402,90 @@ def _extract_named_expression_pair(
     return result
 
 
+
+def _extract_direct_trig_arguments(
+    text,
+    operation_name,
+    parameter_names,
+):
+    """
+    Extract arguments from direct trigonometric function-call syntax.
+
+    Examples:
+        sin(pi/6)     -> {"angle": "pi/6"}
+        cos(pi/3)     -> {"angle": "pi/3"}
+        tan(45)       -> {"angle": 45}
+        asin(1/2)     -> {"value": "1/2"}
+
+    This adapter only applies to the nine basic direct trig operations.
+    It does not handle trig equations or identity/transform operations.
+    """
+
+    operation_aliases = {
+        "sine": ("sin",),
+        "cosine": ("cos",),
+        "tangent": ("tan",),
+        "secant": ("sec",),
+        "cosecant": ("csc",),
+        "cotangent": ("cot",),
+        "arcsine": ("asin", "arcsin"),
+        "arccosine": ("acos", "arccos"),
+        "arctangent": ("atan", "arctan"),
+    }
+
+    aliases = operation_aliases.get(
+        operation_name
+    )
+
+    if aliases is None:
+        return {}
+
+    parameter_set = set(
+        parameter_names
+    )
+
+    target_parameter = (
+        "value"
+        if operation_name in {
+            "arcsine",
+            "arccosine",
+            "arctangent",
+        }
+        else "angle"
+    )
+
+    if target_parameter not in parameter_set:
+        return {}
+
+    alias_pattern = "|".join(
+        re.escape(alias)
+        for alias in sorted(
+            aliases,
+            key=len,
+            reverse=True,
+        )
+    )
+
+    match = re.search(
+        rf"\b(?:{alias_pattern})\s*\(\s*([^()]+?)\s*\)",
+        str(text),
+        flags=re.IGNORECASE,
+    )
+
+    if match is None:
+        return {}
+
+    value = _parse_general_scalar(
+        match.group(1)
+    )
+
+    if value is None:
+        return {}
+
+    return {
+        target_parameter: value
+    }
+
 def extract_semantic_arguments_for_operation(
     text,
     operation_name,
@@ -2420,6 +2504,22 @@ def extract_semantic_arguments_for_operation(
     parameter_names = list(parameter_names)
     parameter_set = set(parameter_names)
     result = {}
+
+    # --------------------------------------------------------
+    # DIRECT TRIGONOMETRIC FUNCTION CALLS
+    # --------------------------------------------------------
+
+    direct_trig_arguments = (
+        _extract_direct_trig_arguments(
+            text,
+            operation_name,
+            parameter_names,
+        )
+    )
+
+    result.update(
+        direct_trig_arguments
+    )
 
     # --------------------------------------------------------
     # BASIC TWO-OPERAND ARITHMETIC

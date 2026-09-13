@@ -97,8 +97,17 @@ def interpret_and_execute_math(text):
     # arguments.
     # ========================================================
 
+    # Route using normalized user text rather than the interpreter's
+    # compressed query. The normalized text preserves mathematical
+    # structure such as "=", inequalities, operators, and function
+    # notation that the router can use for structural disambiguation.
+    routing_query = interpretation.get(
+        "normalized_text",
+        interpretation["query"]
+    )
+
     routing = select_math_operation(
-        query=interpretation["query"],
+        query=routing_query,
         subsystem=interpretation["subsystem"]
     )
 
@@ -109,7 +118,7 @@ def interpret_and_execute_math(text):
         result["routing_execution"] = {
             "success": False,
             "stage": "routing",
-            "query": interpretation["query"],
+            "query": routing_query,
             "operation": None,
             "routing": routing,
             "execution": None,

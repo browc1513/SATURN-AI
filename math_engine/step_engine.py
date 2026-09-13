@@ -20,6 +20,32 @@ def _format_value(value):
     return str(value)
 
 
+def _format_solution(variable, exact_result):
+    """
+    Format a deterministic solver result for human-readable steps.
+
+    Examples:
+        [5]      -> x = 5
+        [-2, 2]  -> x = -2 or x = 2
+        []       -> no solution
+    """
+
+    if isinstance(exact_result, (list, tuple)):
+
+        if len(exact_result) == 0:
+            return "no solution"
+
+        if len(exact_result) == 1:
+            return f"{variable} = {exact_result[0]}"
+
+        return " or ".join(
+            f"{variable} = {value}"
+            for value in exact_result
+        )
+
+    return f"{variable} = {exact_result}"
+
+
 # ============================================================
 # ARITHMETIC
 # ============================================================
@@ -52,13 +78,23 @@ def _steps_solve_equation(arguments, exact_result):
     """
     Generate conservative steps for equation solving.
 
-    NOVA does not claim intermediate symbolic transformations
+    The universal argument extractor supplies:
+        left_side
+        right_side
+        variable
+
+    NOVA does not invent intermediate algebraic transformations
     unless they were explicitly produced by a deterministic
-    solver.
+    symbolic step solver.
     """
 
-    equation = arguments.get(
-        "equation"
+    left_side = arguments.get(
+        "left_side"
+    )
+
+    right_side = arguments.get(
+        "right_side",
+        0
     )
 
     variable = arguments.get(
@@ -66,13 +102,23 @@ def _steps_solve_equation(arguments, exact_result):
         "x"
     )
 
-    if equation is None:
+    if left_side is None:
         return None
 
+    equation = (
+        f"{left_side} = {right_side}"
+    )
+
+    solution_text = _format_solution(
+        variable,
+        exact_result
+    )
+
     return [
-        f"Solve the equation {equation} for {variable}.",
-        "Use NOVA's deterministic algebra solver to find the solution set.",
-        f"The solution is {exact_result}."
+        f"Start with the equation {equation}.",
+        f"Solve the equation for {variable} using NOVA's deterministic algebra solver.",
+        f"The solution set is {exact_result}.",
+        f"Therefore, {solution_text}."
     ]
 
 
@@ -121,6 +167,118 @@ def _steps_sphere_volume(arguments, exact_result):
 
 
 # ============================================================
+# TRIGONOMETRY
+# ============================================================
+
+def _steps_direct_trig(arguments, exact_result, operation_name):
+    """
+    Generate steps for direct trigonometric function evaluation.
+
+    This generator does not calculate independently. It explains
+    the exact result already produced by NOVA's deterministic
+    trigonometry subsystem.
+    """
+
+    trig_metadata = {
+        "sine": {
+            "display_name": "sin",
+            "parameter": "angle",
+            "inverse": False,
+        },
+        "cosine": {
+            "display_name": "cos",
+            "parameter": "angle",
+            "inverse": False,
+        },
+        "tangent": {
+            "display_name": "tan",
+            "parameter": "angle",
+            "inverse": False,
+        },
+        "secant": {
+            "display_name": "sec",
+            "parameter": "angle",
+            "inverse": False,
+        },
+        "cosecant": {
+            "display_name": "csc",
+            "parameter": "angle",
+            "inverse": False,
+        },
+        "cotangent": {
+            "display_name": "cot",
+            "parameter": "angle",
+            "inverse": False,
+        },
+        "arcsine": {
+            "display_name": "arcsin",
+            "parameter": "value",
+            "inverse": True,
+        },
+        "arccosine": {
+            "display_name": "arccos",
+            "parameter": "value",
+            "inverse": True,
+        },
+        "arctangent": {
+            "display_name": "arctan",
+            "parameter": "value",
+            "inverse": True,
+        },
+    }
+
+    metadata = trig_metadata.get(
+        operation_name
+    )
+
+    if metadata is None:
+        return None
+
+    input_value = arguments.get(
+        metadata["parameter"]
+    )
+
+    if input_value is None:
+        return None
+
+    display_name = metadata["display_name"]
+    expression = (
+        f"{display_name}({input_value})"
+    )
+
+    if metadata["inverse"]:
+
+        return [
+            f"Evaluate {expression}.",
+            f"Find the angle whose corresponding trigonometric value is {input_value}.",
+            f"{expression} = {exact_result}.",
+            f"Therefore, the result is {exact_result}."
+        ]
+
+    return [
+        f"Evaluate {expression}.",
+        "Use the exact trigonometric value for the given angle.",
+        f"{expression} = {exact_result}.",
+        f"Therefore, the result is {exact_result}."
+    ]
+
+
+def _make_direct_trig_generator(operation_name):
+    """
+    Create a registry-compatible wrapper for one direct trig operation.
+    """
+
+    def generator(arguments, exact_result):
+        return _steps_direct_trig(
+            arguments,
+            exact_result,
+            operation_name,
+        )
+
+    return generator
+
+
+# ============================================================
 # CALCULUS
 # ============================================================
 
@@ -128,9 +286,8 @@ def _steps_derivative(arguments, exact_result):
     """
     Generate basic derivative steps.
 
-    Interpreter v1 currently handles simple derivative
-    expressions. This generator remains conservative and
-    does not invent a detailed symbolic derivation.
+    This generator remains conservative and does not invent
+    a detailed symbolic derivation.
     """
 
     expression = arguments.get(
@@ -163,6 +320,16 @@ STEP_GENERATORS = {
     "circle_area": _steps_circle_area,
     "sphere_volume": _steps_sphere_volume,
     "derivative": _steps_derivative,
+
+    "sine": _make_direct_trig_generator("sine"),
+    "cosine": _make_direct_trig_generator("cosine"),
+    "tangent": _make_direct_trig_generator("tangent"),
+    "secant": _make_direct_trig_generator("secant"),
+    "cosecant": _make_direct_trig_generator("cosecant"),
+    "cotangent": _make_direct_trig_generator("cotangent"),
+    "arcsine": _make_direct_trig_generator("arcsine"),
+    "arccosine": _make_direct_trig_generator("arccosine"),
+    "arctangent": _make_direct_trig_generator("arctangent"),
 }
 
 
