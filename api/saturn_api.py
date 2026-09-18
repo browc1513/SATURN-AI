@@ -1,4 +1,8 @@
-﻿from fastapi import FastAPI, HTTPException
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from assistant_tools.list_tool import get_all_lists
@@ -15,6 +19,15 @@ app = FastAPI(
 # own alarm firing. The voice/runtime SATURN process owns the
 # background alarm monitor.
 saturn = get_saturn(start_alarm_monitor=False)
+
+
+PWA_DIR = Path(__file__).resolve().parent.parent / "pwa"
+
+app.mount(
+    "/app",
+    StaticFiles(directory=PWA_DIR),
+    name="app",
+)
 
 
 class QueryRequest(BaseModel):
@@ -53,11 +66,9 @@ def run_saturn_query(text: str):
 
 @app.get("/")
 def root():
-    return {
-        "name": "S.A.T.U.R.N.",
-        "status": "online",
-        "version": "0.4.0",
-    }
+    return FileResponse(
+        PWA_DIR / "index.html"
+    )
 
 
 @app.get("/api/health")

@@ -1,0 +1,774 @@
+﻿const homeView = document.getElementById("home-view");
+const listsView = document.getElementById("lists-view");
+const alarmsView = document.getElementById("alarms-view");
+
+const listsButton = document.getElementById("lists-button");
+const alarmsButton = document.getElementById("alarms-button");
+
+const listsBackButton = document.getElementById("lists-back-button");
+const alarmsBackButton = document.getElementById("alarms-back-button");
+
+const listsContainer = document.getElementById("lists-container");
+const alarmsContainer = document.getElementById("alarms-container");
+
+const createListForm = document.getElementById("create-list-form");
+const newListName = document.getElementById("new-list-name");
+const createListButton = document.getElementById("create-list-button");
+
+const createAlarmForm = document.getElementById("create-alarm-form");
+const newAlarmTime = document.getElementById("new-alarm-time");
+const createAlarmButton = document.getElementById("create-alarm-button");
+
+
+async function checkSaturnStatus() {
+    const status = document.getElementById("status");
+
+    try {
+        const response = await fetch("/api/health");
+
+        if (!response.ok) {
+            throw new Error("Health request failed.");
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.status === "online") {
+            status.textContent = "SATURN Online";
+            status.className = "status status-online";
+            return;
+        }
+
+        throw new Error("SATURN reported offline.");
+    } catch (error) {
+        status.textContent = "SATURN Offline";
+        status.className = "status status-offline";
+    }
+}
+
+
+function hideAllViews() {
+    homeView.classList.add("hidden");
+    listsView.classList.add("hidden");
+    alarmsView.classList.add("hidden");
+}
+
+
+function showHome() {
+    hideAllViews();
+    homeView.classList.remove("hidden");
+}
+
+
+async function showLists() {
+    hideAllViews();
+    listsView.classList.remove("hidden");
+
+    await loadLists();
+}
+
+
+async function showAlarms() {
+    hideAllViews();
+    alarmsView.classList.remove("hidden");
+
+    await loadAlarms();
+}
+
+
+async function loadLists() {
+    listsContainer.innerHTML = `
+        <p class="loading-message">
+            Loading lists...
+        </p>
+    `;
+
+    try {
+        const response = await fetch("/api/lists");
+
+        if (!response.ok) {
+            throw new Error("List request failed.");
+        }
+
+        const data = await response.json();
+
+        if (!data.success || !data.result?.success) {
+            throw new Error("SATURN could not retrieve lists.");
+        }
+
+        renderLists(data.result.lists);
+    } catch (error) {
+        listsContainer.innerHTML = `
+            <p class="error-message">
+                Unable to load SATURN lists.
+            </p>
+        `;
+    }
+}
+
+
+async function createList(name) {
+    const cleanName = name.trim();
+
+    if (!cleanName) {
+        return;
+    }
+
+    const response = await fetch(
+        "/api/lists",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name: cleanName,
+            }),
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Create list request failed.");
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.result?.success) {
+        throw new Error("SATURN could not create the list.");
+    }
+
+    await loadLists();
+}
+
+
+async function addListItem(listName, item) {
+    const cleanItem = item.trim();
+
+    if (!cleanItem) {
+        return;
+    }
+
+    const response = await fetch(
+        `/api/lists/${encodeURIComponent(listName)}/items`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                item: cleanItem,
+            }),
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Add item request failed.");
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.result?.success) {
+        throw new Error("SATURN could not add the item.");
+    }
+
+    await loadLists();
+}
+
+
+async function removeListItem(listName, item) {
+    const response = await fetch(
+        `/api/lists/${encodeURIComponent(listName)}/items/${encodeURIComponent(item)}`,
+        {
+            method: "DELETE",
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Remove item request failed.");
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.result?.success) {
+        throw new Error("SATURN could not remove the item.");
+    }
+
+    await loadLists();
+}
+
+
+async function clearList(listName) {
+    const response = await fetch(
+        `/api/lists/${encodeURIComponent(listName)}/items`,
+        {
+            method: "DELETE",
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Clear list request failed.");
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.result?.success) {
+        throw new Error("SATURN could not clear the list.");
+    }
+
+    await loadLists();
+}
+
+
+async function deleteList(listName) {
+    const response = await fetch(
+        `/api/lists/${encodeURIComponent(listName)}`,
+        {
+            method: "DELETE",
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Delete list request failed.");
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.result?.success) {
+        throw new Error("SATURN could not delete the list.");
+    }
+
+    await loadLists();
+}
+
+
+function renderLists(lists) {
+    listsContainer.innerHTML = "";
+
+    if (!lists.length) {
+        listsContainer.innerHTML = `
+            <p class="empty-list">
+                You don't have any lists yet.
+            </p>
+        `;
+
+        return;
+    }
+
+    for (const list of lists) {
+        const card = document.createElement("section");
+        card.className = "list-card";
+
+        const header = document.createElement("div");
+        header.className = "list-card-header";
+
+        const heading = document.createElement("h3");
+        heading.textContent = list.display_name;
+
+        const controls = document.createElement("div");
+        controls.className = "list-controls";
+
+        const clearButton = document.createElement("button");
+        clearButton.className = "list-control-button";
+        clearButton.type = "button";
+        clearButton.textContent = "Clear";
+
+        clearButton.addEventListener(
+            "click",
+            async () => {
+                if (!list.items.length) {
+                    return;
+                }
+
+                if (!confirm(
+                    `Clear every item from ${list.display_name}?`
+                )) {
+                    return;
+                }
+
+                clearButton.disabled = true;
+
+                try {
+                    await clearList(list.name);
+                } catch (error) {
+                    alert("SATURN could not clear that list.");
+                    clearButton.disabled = false;
+                }
+            }
+        );
+
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "list-control-button delete-list-button";
+        deleteButton.type = "button";
+        deleteButton.textContent = "Delete";
+
+        deleteButton.addEventListener(
+            "click",
+            async () => {
+                if (!confirm(
+                    `Delete the ${list.display_name} list?`
+                )) {
+                    return;
+                }
+
+                deleteButton.disabled = true;
+
+                try {
+                    await deleteList(list.name);
+                } catch (error) {
+                    alert("SATURN could not delete that list.");
+                    deleteButton.disabled = false;
+                }
+            }
+        );
+
+        controls.appendChild(clearButton);
+        controls.appendChild(deleteButton);
+
+        header.appendChild(heading);
+        header.appendChild(controls);
+
+        card.appendChild(header);
+
+        if (!list.items.length) {
+            const empty = document.createElement("p");
+
+            empty.className = "empty-list";
+            empty.textContent = "This list is empty.";
+
+            card.appendChild(empty);
+        } else {
+            const itemList = document.createElement("ul");
+
+            itemList.className = "list-items editable-list-items";
+
+            for (const item of list.items) {
+                const row = document.createElement("li");
+                row.className = "list-item-row";
+
+                const itemText = document.createElement("span");
+                itemText.className = "list-item-text";
+                itemText.textContent = item;
+
+                const removeButton = document.createElement("button");
+
+                removeButton.className = "remove-item-button";
+                removeButton.type = "button";
+                removeButton.textContent = "Remove";
+
+                removeButton.addEventListener(
+                    "click",
+                    async () => {
+                        removeButton.disabled = true;
+
+                        try {
+                            await removeListItem(
+                                list.name,
+                                item
+                            );
+                        } catch (error) {
+                            alert(
+                                "SATURN could not remove that item."
+                            );
+
+                            removeButton.disabled = false;
+                        }
+                    }
+                );
+
+                row.appendChild(itemText);
+                row.appendChild(removeButton);
+
+                itemList.appendChild(row);
+            }
+
+            card.appendChild(itemList);
+        }
+
+        const form = document.createElement("form");
+        form.className = "add-item-form";
+
+        const input = document.createElement("input");
+        input.className = "item-input";
+        input.type = "text";
+        input.placeholder = "Add an item...";
+        input.autocomplete = "off";
+
+        const button = document.createElement("button");
+        button.className = "add-item-button";
+        button.type = "submit";
+        button.textContent = "Add";
+
+        form.appendChild(input);
+        form.appendChild(button);
+
+        form.addEventListener(
+            "submit",
+            async (event) => {
+                event.preventDefault();
+
+                button.disabled = true;
+                input.disabled = true;
+
+                try {
+                    await addListItem(
+                        list.name,
+                        input.value
+                    );
+                } catch (error) {
+                    alert(
+                        "SATURN could not add that item."
+                    );
+
+                    button.disabled = false;
+                    input.disabled = false;
+                }
+            }
+        );
+
+        card.appendChild(form);
+
+        listsContainer.appendChild(card);
+    }
+}
+
+
+async function loadAlarms() {
+    alarmsContainer.innerHTML = `
+        <p class="loading-message">
+            Loading alarms...
+        </p>
+    `;
+
+    try {
+        const response = await fetch("/api/alarms");
+
+        if (!response.ok) {
+            throw new Error("Alarm request failed.");
+        }
+
+        const data = await response.json();
+
+        if (!data.success || !data.result?.success) {
+            throw new Error("SATURN could not retrieve alarms.");
+        }
+
+        renderAlarms(data.result.data?.alarms ?? []);
+    } catch (error) {
+        alarmsContainer.innerHTML = `
+            <p class="error-message">
+                Unable to load SATURN alarms.
+            </p>
+        `;
+    }
+}
+
+
+async function createAlarm(time) {
+    const cleanTime = time.trim();
+
+    if (!cleanTime) {
+        return;
+    }
+
+    const response = await fetch(
+        "/api/alarms",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                time: cleanTime,
+            }),
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Create alarm request failed.");
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.result?.success) {
+        throw new Error("SATURN could not create the alarm.");
+    }
+
+    await loadAlarms();
+}
+
+
+async function cancelAlarm(alarmTime) {
+    const response = await fetch(
+        `/api/alarms/${encodeURIComponent(alarmTime)}`,
+        {
+            method: "DELETE",
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Cancel alarm request failed.");
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.result?.success) {
+        throw new Error("SATURN could not cancel the alarm.");
+    }
+
+    await loadAlarms();
+}
+
+
+async function cancelAllAlarms() {
+    const response = await fetch(
+        "/api/alarms",
+        {
+            method: "DELETE",
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error("Cancel all alarms request failed.");
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.result?.success) {
+        throw new Error("SATURN could not cancel the alarms.");
+    }
+
+    await loadAlarms();
+}
+
+
+function renderAlarms(alarms) {
+    alarmsContainer.innerHTML = "";
+
+    if (!alarms.length) {
+        alarmsContainer.innerHTML = `
+            <section class="list-card">
+                <p class="empty-list">
+                    You don't have any active alarms.
+                </p>
+            </section>
+        `;
+
+        return;
+    }
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "alarm-toolbar";
+
+    const cancelAllButton = document.createElement("button");
+
+    cancelAllButton.className =
+        "list-control-button delete-list-button";
+
+    cancelAllButton.type = "button";
+    cancelAllButton.textContent = "Cancel All Alarms";
+
+    cancelAllButton.addEventListener(
+        "click",
+        async () => {
+            if (!confirm("Cancel all active alarms?")) {
+                return;
+            }
+
+            cancelAllButton.disabled = true;
+
+            try {
+                await cancelAllAlarms();
+            } catch (error) {
+                alert(
+                    "SATURN could not cancel all alarms."
+                );
+
+                cancelAllButton.disabled = false;
+            }
+        }
+    );
+
+    toolbar.appendChild(cancelAllButton);
+    alarmsContainer.appendChild(toolbar);
+
+    for (const alarm of alarms) {
+        const card = document.createElement("section");
+        card.className = "list-card";
+
+        const header = document.createElement("div");
+        header.className = "list-card-header";
+
+        const information = document.createElement("div");
+
+        const heading = document.createElement("h3");
+
+        const trigger = new Date(alarm.trigger_at);
+
+        const displayTime = trigger.toLocaleTimeString(
+            [],
+            {
+                hour: "numeric",
+                minute: "2-digit",
+            }
+        );
+
+        heading.textContent = displayTime;
+
+        const date = document.createElement("p");
+        date.className = "empty-list";
+
+        date.textContent = trigger.toLocaleDateString(
+            [],
+            {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+            }
+        );
+
+        information.appendChild(heading);
+        information.appendChild(date);
+
+        const cancelButton = document.createElement("button");
+
+        cancelButton.className =
+            "list-control-button delete-list-button";
+
+        cancelButton.type = "button";
+        cancelButton.textContent = "Cancel";
+
+        cancelButton.addEventListener(
+            "click",
+            async () => {
+                if (!confirm(
+                    `Cancel the ${displayTime} alarm?`
+                )) {
+                    return;
+                }
+
+                cancelButton.disabled = true;
+
+                try {
+                    await cancelAlarm(displayTime);
+                } catch (error) {
+                    alert(
+                        "SATURN could not cancel that alarm."
+                    );
+
+                    cancelButton.disabled = false;
+                }
+            }
+        );
+
+        header.appendChild(information);
+        header.appendChild(cancelButton);
+
+        card.appendChild(header);
+        alarmsContainer.appendChild(card);
+    }
+}
+
+
+createListForm.addEventListener(
+    "submit",
+    async (event) => {
+        event.preventDefault();
+
+        const name = newListName.value.trim();
+
+        if (!name) {
+            return;
+        }
+
+        createListButton.disabled = true;
+        newListName.disabled = true;
+
+        try {
+            await createList(name);
+            newListName.value = "";
+        } catch (error) {
+            alert("SATURN could not create that list.");
+        } finally {
+            createListButton.disabled = false;
+            newListName.disabled = false;
+            newListName.focus();
+        }
+    }
+);
+
+
+createAlarmForm.addEventListener(
+    "submit",
+    async (event) => {
+        event.preventDefault();
+
+        const time = newAlarmTime.value.trim();
+
+        if (!time) {
+            return;
+        }
+
+        createAlarmButton.disabled = true;
+        newAlarmTime.disabled = true;
+
+        try {
+            await createAlarm(time);
+            newAlarmTime.value = "";
+        } catch (error) {
+            alert("SATURN could not set that alarm.");
+        } finally {
+            createAlarmButton.disabled = false;
+            newAlarmTime.disabled = false;
+            newAlarmTime.focus();
+        }
+    }
+);
+
+
+listsButton.addEventListener(
+    "click",
+    showLists
+);
+
+alarmsButton.addEventListener(
+    "click",
+    showAlarms
+);
+
+listsBackButton.addEventListener(
+    "click",
+    showHome
+);
+
+alarmsBackButton.addEventListener(
+    "click",
+    showHome
+);
+
+
+checkSaturnStatus();
+
+
+if ("serviceWorker" in navigator) {
+    window.addEventListener(
+        "load",
+        async () => {
+            try {
+                await navigator.serviceWorker.register(
+                    "/app/service-worker.js",
+                    {
+                        scope: "/",
+                    }
+                );
+
+                console.log(
+                    "SATURN service worker registered."
+                );
+            } catch (error) {
+                console.error(
+                    "SATURN service worker registration failed:",
+                    error
+                );
+            }
+        }
+    );
+}

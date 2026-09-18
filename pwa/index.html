@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="theme-color"
+        content="#111827"
+    >
+
+    <title>S.A.T.U.R.N.</title>
+
+    <link
+        rel="manifest"
+        href="/app/manifest.json"
+    >
+
+    <link
+        rel="apple-touch-icon"
+        href="/app/icon-192.png"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/app/style.css"
+    >
+</head>
+
+<body>
+    <main class="app-shell">
+
+        <header class="app-header">
+            <div>
+                <p class="eyebrow">
+                    Science, Art, Technology User Reference Network
+                </p>
+
+                <h1>S.A.T.U.R.N.</h1>
+            </div>
+
+            <div
+                id="status"
+                class="status status-checking"
+            >
+                Checking...
+            </div>
+        </header>
+
+        <section
+            id="home-view"
+            class="view"
+        >
+            <section class="hero-card">
+                <p class="section-label">
+                    LOCAL ASSISTANT
+                </p>
+
+                <h2>SATURN Control</h2>
+
+                <p>
+                    Your local household interface for lists,
+                    alarms, and SATURN services.
+                </p>
+            </section>
+
+            <section class="dashboard">
+
+                <button
+                    id="lists-button"
+                    class="dashboard-card"
+                    type="button"
+                >
+                    <span class="card-icon">☷</span>
+
+                    <span>
+                        <strong>Lists</strong>
+                        <small>Household lists and items</small>
+                    </span>
+                </button>
+
+                <button
+                    id="alarms-button"
+                    class="dashboard-card"
+                    type="button"
+                >
+                    <span class="card-icon">⏰</span>
+
+                    <span>
+                        <strong>Alarms</strong>
+                        <small>View and manage alarms</small>
+                    </span>
+                </button>
+
+            </section>
+        </section>
+
+        <section
+            id="lists-view"
+            class="view hidden"
+        >
+            <div class="view-heading">
+
+                <button
+                    id="lists-back-button"
+                    class="back-button"
+                    type="button"
+                >
+                    ← Back
+                </button>
+
+                <div>
+                    <p class="section-label">
+                        HOUSEHOLD
+                    </p>
+
+                    <h2>Lists</h2>
+                </div>
+
+            </div>
+
+            <form
+                id="create-list-form"
+                class="create-list-form"
+            >
+                <input
+                    id="new-list-name"
+                    class="item-input"
+                    type="text"
+                    placeholder="New list name..."
+                    autocomplete="off"
+                >
+
+                <button
+                    id="create-list-button"
+                    class="add-item-button"
+                    type="submit"
+                >
+                    Create List
+                </button>
+            </form>
+
+            <div
+                id="lists-container"
+                class="list-grid"
+            >
+                <p class="loading-message">
+                    Loading lists...
+                </p>
+            </div>
+        </section>
+
+        <section
+            id="alarms-view"
+            class="view hidden"
+        >
+            <div class="view-heading">
+
+                <button
+                    id="alarms-back-button"
+                    class="back-button"
+                    type="button"
+                >
+                    ← Back
+                </button>
+
+                <div>
+                    <p class="section-label">
+                        HOUSEHOLD
+                    </p>
+
+                    <h2>Alarms</h2>
+                </div>
+
+            </div>
+
+            <form
+                id="create-alarm-form"
+                class="create-list-form"
+            >
+                <input
+                    id="new-alarm-time"
+                    class="item-input"
+                    type="text"
+                    placeholder="Example: 8:30 AM"
+                    autocomplete="off"
+                >
+
+                <button
+                    id="create-alarm-button"
+                    class="add-item-button"
+                    type="submit"
+                >
+                    Set Alarm
+                </button>
+            </form>
+
+            <div
+                id="alarms-container"
+                class="list-grid"
+            >
+                <p class="loading-message">
+                    Loading alarms...
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/app/app.js"></script>
+</body>
+</html>
