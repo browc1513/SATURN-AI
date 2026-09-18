@@ -23,6 +23,7 @@ import time
 import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import subprocess
 
 try:
     import winsound
@@ -609,14 +610,14 @@ def handle_alarm_query(text):
 
 def play_alarm_sound(repetitions=5):
     """
-    Play the configured Microsoft Windows System Alarm sound.
+    Play SATURN's alarm sound.
 
-    On Windows this uses the user's current Windows sound scheme via
-    the built-in winsound module, so no extra audio package is needed.
+    On Windows, use the configured Microsoft Windows System Alarm.
 
-    On non-Windows systems, fall back to the terminal bell. This makes
-    the function safe to keep when SATURN is later moved to Raspberry Pi;
-    the Pi-specific audio implementation can replace this fallback.
+    On Linux, play an audible sine-wave alarm through the system's
+    default audio output. This allows PipeWire/WirePlumber to route
+    the alarm to the active SATURN speaker, such as the Jabra
+    SPEAK 510 USB.
     """
 
     repetitions = max(
@@ -645,6 +646,40 @@ def play_alarm_sound(repetitions=5):
 
         return True
 
+    if sys.platform.startswith("linux"):
+        for _ in range(repetitions):
+            try:
+                subprocess.run(
+                    [
+                        "speaker-test",
+                        "-t",
+                        "sine",
+                        "-f",
+                        "880",
+                        "-l",
+                        "1",
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    timeout=3,
+                )
+            except (
+                OSError,
+                subprocess.TimeoutExpired,
+            ):
+                print(
+                    "\a",
+                    end="",
+                    flush=True,
+                )
+
+            time.sleep(
+                0.15
+            )
+
+        return True
+
     for _ in range(repetitions):
         print(
             "\a",
@@ -656,7 +691,6 @@ def play_alarm_sound(repetitions=5):
         )
 
     return True
-
 
 def check_due_alarms(mark_fired=True):
     """
