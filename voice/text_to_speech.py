@@ -1,13 +1,18 @@
 """
 S.A.T.U.R.N. Text-to-Speech
 
-Offline desktop text-to-speech using pyttsx3.
+Offline text-to-speech using pyttsx3.
 
-Windows backend:
-    Microsoft SAPI5
+Public interfaces:
 
-The public interface is intentionally small so the backend can later
-be replaced on Raspberry Pi without changing SATURN's GUI or tools.
+    speak_async(text)
+        Queue speech and return immediately.
+
+    speak_and_wait(text)
+        Queue speech and wait until that specific speech job finishes.
+
+This lets the GUI remain non-blocking while the hands-free voice
+assistant can synchronize microphone handoffs with TTS completion.
 """
 
 import queue
@@ -25,7 +30,7 @@ _speech_queue = queue.Queue()
 _worker_started = False
 _worker_lock = threading.Lock()
 
-# Temporary desktop voice preferences.
+# Temporary voice preferences.
 # Later these can move into saturn_config.json.
 _preferred_voice_name = "Zira"
 _preferred_voice_index = None
@@ -38,9 +43,7 @@ def set_voice_enabled(enabled):
 
     global _voice_enabled
 
-    _voice_enabled = bool(
-        enabled
-    )
+    _voice_enabled = bool(enabled)
 
 
 def is_voice_enabled():
@@ -71,7 +74,6 @@ def _clean_for_speech(text):
             new,
         )
 
-    # Collapse repeated spaces and punctuation created by formatting.
     text = " ".join(
         text.split()
     )
@@ -83,8 +85,8 @@ def _speech_worker():
     """
     Dedicated speech worker.
 
-    Keeping pyttsx3 inside one background thread avoids blocking
-    Tkinter and avoids multiple TTS engines speaking at once.
+    Every queue item contains both the text to speak and an optional
+    threading.Event used to signal that the speech job has finished.
     """
 
     if pyttsx3 is None:
@@ -129,7 +131,6 @@ def _speech_worker():
                 selected_voice.id,
             )
 
-        # Conservative defaults for readable assistant speech.
         engine.setProperty(
             "rate",
             180,
@@ -141,16 +142,21 @@ def _speech_worker():
         )
 
         while True:
-            text = _speech_queue.get()
+            job = _speech_queue.get()
 
-            if text is None:
+            if job is None:
+                _speech_queue.task_done()
                 break
 
-            if not _voice_enabled:
-                _speech_queue.task_done()
-                continue
+            text = job["text"]
+            finished_event = job.get(
+                "finished_event"
+            )
 
             try:
+                if not _voice_enabled:
+                    continue
+
                 spoken_text = _clean_for_speech(
                     text
                 )
@@ -159,6 +165,7 @@ def _speech_worker():
                     engine.say(
                         spoken_text
                     )
+
                     engine.runAndWait()
 
             except Exception as error:
@@ -168,6 +175,9 @@ def _speech_worker():
                 )
 
             finally:
+                if finished_event is not None:
+                    finished_event.set()
+
                 _speech_queue.task_done()
 
     except Exception as error:
@@ -200,9 +210,6 @@ def _ensure_worker():
 def get_available_voices():
     """
     Return installed system voices in a simple structured format.
-
-    On Windows these are the Microsoft SAPI voices currently installed
-    for the active Python environment/user.
     """
 
     if pyttsx3 is None:
@@ -210,6 +217,7 @@ def get_available_voices():
 
     try:
         engine = pyttsx3.init()
+
         voices = engine.getProperty(
             "voices"
         ) or []
@@ -261,8 +269,8 @@ def set_preferred_voice(
     """
     Set the preferred voice for future speech worker startup.
 
-    This updates the module-level preference. Restart SATURN after
-    changing it so the speech engine is recreated with the new voice.
+    Restart SATURN after changing it so the speech engine is recreated
+    with the new voice.
     """
 
     global _preferred_voice_name
@@ -290,7 +298,7 @@ def get_voice_preference():
 
 def speak_async(text):
     """
-    Queue text to be spoken without blocking the GUI.
+    Queue text to be spoken without blocking the caller.
     """
 
     if not _voice_enabled:
@@ -299,12 +307,49 @@ def speak_async(text):
     if pyttsx3 is None:
         print(
             "S.A.T.U.R.N. TTS is unavailable. "
-            "Install it with: python -m pip install pyttsx3"
+            "Install it with: "
+            "python -m pip install pyttsx3"
         )
         return
 
     _ensure_worker()
 
     _speech_queue.put(
-        str(text)
+        {
+            "text": str(text),
+            "finished_event": None,
+        }
     )
+
+
+def speak_and_wait(text):
+    """
+    Speak text and block until that specific TTS job has finished.
+
+    This is intended for microphone/TTS synchronization in the
+    hands-free voice assistant.
+    """
+
+    if not _voice_enabled:
+        return
+
+    if pyttsx3 is None:
+        print(
+            "S.A.T.U.R.N. TTS is unavailable. "
+            "Install it with: "
+            "python -m pip install pyttsx3"
+        )
+        return
+
+    _ensure_worker()
+
+    finished_event = threading.Event()
+
+    _speech_queue.put(
+        {
+            "text": str(text),
+            "finished_event": finished_event,
+        }
+    )
+
+    finished_event.wait()

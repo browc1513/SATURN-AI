@@ -1,8 +1,6 @@
-import time
-
 from core.saturn_instance import get_saturn
 from voice.speech_to_text import listen_once
-from voice.text_to_speech import speak_async
+from voice.text_to_speech import speak_and_wait
 from voice.wake_word import (
     MODEL_PATH,
     create_wake_model,
@@ -11,27 +9,6 @@ from voice.wake_word import (
 
 
 ACKNOWLEDGEMENT = "Yes?"
-
-# Temporary synchronization because speak_async() queues speech
-# in another thread and returns immediately.
-ACKNOWLEDGEMENT_WAIT_SECONDS = 2.0
-
-
-def wait_for_response_speech(response):
-    """
-    Temporary v1 approximation of TTS duration.
-
-    Later this should be replaced with explicit TTS completion
-    signaling instead of a timer.
-    """
-
-    return max(
-        3,
-        min(
-            10,
-            len(str(response)) / 15,
-        ),
-    )
 
 
 def main():
@@ -45,8 +22,7 @@ def main():
     saturn = get_saturn()
 
     # ----------------------------------------------------------
-    # Load the same custom wake model used by the proven
-    # standalone wake-word listener.
+    # Load custom Hey Saturn wake-word model
     # ----------------------------------------------------------
     print(
         f"Loading wake-word model: {MODEL_PATH}"
@@ -57,6 +33,7 @@ def main():
     print(
         "S.A.T.U.R.N. voice assistant is ready."
     )
+
     print(
         "Press Ctrl+C to stop.\n"
     )
@@ -65,10 +42,7 @@ def main():
         while True:
 
             # --------------------------------------------------
-            # 1. Wait for Hey Saturn
-            #
-            # This calls the exact reusable listener from
-            # voice/wake_word.py.
+            # 1. Wait for "Hey Saturn"
             # --------------------------------------------------
             wait_for_wake_word(
                 wake_model
@@ -76,21 +50,20 @@ def main():
 
             # --------------------------------------------------
             # 2. Acknowledge wake event
+            #
+            # Wait for the actual TTS engine to finish instead
+            # of guessing how long "Yes?" takes.
             # --------------------------------------------------
             print(
                 "S.A.T.U.R.N.: Yes?"
             )
 
-            speak_async(
+            speak_and_wait(
                 ACKNOWLEDGEMENT
             )
 
-            time.sleep(
-                ACKNOWLEDGEMENT_WAIT_SECONDS
-            )
-
             # --------------------------------------------------
-            # 3. Listen for one command
+            # 3. Immediately hand the microphone to STT
             # --------------------------------------------------
             print(
                 "Listening for command..."
@@ -119,11 +92,9 @@ def main():
                         f"{speech_result['error']}"
                     )
 
-                speak_async(
+                speak_and_wait(
                     response
                 )
-
-                time.sleep(3)
 
                 print()
 
@@ -141,7 +112,7 @@ def main():
             )
 
             # --------------------------------------------------
-            # 6. Send raw command through SATURN
+            # 6. Route through SATURN
             # --------------------------------------------------
             result = saturn.handle_query(
                 command
@@ -157,19 +128,15 @@ def main():
             )
 
             # --------------------------------------------------
-            # 7. Speak SATURN response
+            # 7. Speak response and wait for actual completion
             # --------------------------------------------------
-            speak_async(
+            speak_and_wait(
                 response
             )
 
-            time.sleep(
-                wait_for_response_speech(
-                    response
-                )
-            )
-
             print()
+
+            # Loop immediately returns to wake-word listening.
 
     except KeyboardInterrupt:
         print(
