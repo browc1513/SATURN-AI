@@ -18,14 +18,30 @@ MODEL_PATH = (
 )
 
 
-def main():
-    print("Loading openWakeWord...")
-    print(f"Model: {MODEL_PATH}")
+def create_wake_model():
+    """
+    Load and return the custom Hey Saturn wake-word model.
+    """
 
-    model = Model(
+    return Model(
         wakeword_models=[str(MODEL_PATH)],
         inference_framework="onnx",
     )
+
+
+def wait_for_wake_word(model):
+    """
+    Listen until Hey Saturn is detected.
+
+    The microphone stream is closed before returning so another
+    subsystem, such as speech-to-text, can safely use the microphone.
+
+    Returns:
+        {
+            "wakeword": str,
+            "score": float
+        }
+    """
 
     audio = pyaudio.PyAudio()
 
@@ -37,8 +53,7 @@ def main():
         frames_per_buffer=CHUNK,
     )
 
-    print("Listening for 'Hey Saturn'...")
-    print("Press Ctrl+C to stop.\n")
+    print("Waiting for 'Hey Saturn'...")
 
     try:
         while True:
@@ -52,7 +67,9 @@ def main():
                 dtype=np.int16,
             )
 
-            prediction = model.predict(audio_frame)
+            prediction = model.predict(
+                audio_frame
+            )
 
             for wakeword, score in prediction.items():
                 if score >= THRESHOLD:
@@ -62,15 +79,45 @@ def main():
                     )
 
                     model.reset()
-                    time.sleep(1)
 
-    except KeyboardInterrupt:
-        print("\nStopping wake-word listener...")
+                    return {
+                        "wakeword": wakeword,
+                        "score": float(score),
+                    }
 
     finally:
         stream.stop_stream()
         stream.close()
         audio.terminate()
+
+
+def main():
+    """
+    Standalone wake-word test.
+    """
+
+    print("Loading openWakeWord...")
+    print(f"Model: {MODEL_PATH}")
+
+    model = create_wake_model()
+
+    print("Listening for 'Hey Saturn'...")
+    print("Press Ctrl+C to stop.\n")
+
+    try:
+        while True:
+            wait_for_wake_word(
+                model
+            )
+
+            # Preserve the behavior of the original known-good
+            # standalone listener.
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print(
+            "\nStopping wake-word listener..."
+        )
 
 
 if __name__ == "__main__":
