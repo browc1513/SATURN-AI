@@ -7,24 +7,34 @@ import time
 
 
 class SATURN:
-    def __init__(self, config_path="saturn_config.json"):
+    def __init__(
+        self,
+        config_path="saturn_config.json",
+        start_alarm_monitor=True,
+    ):
         self.name = "S.A.T.U.R.N."
         self.mode = "science"
         self.voice_enabled = False
 
         self.load_config(config_path)
 
-        # Start SATURN's background alarm monitor.
-        # It runs only while the SATURN process is alive.
-        self._alarm_monitor_running = True
+        # Alarm monitoring is enabled by default so existing SATURN
+        # interfaces retain their current behavior. Interfaces that
+        # should not own alarm firing, such as the API process, can
+        # explicitly disable it.
+        self._alarm_monitor_running = False
+        self._alarm_monitor_thread = None
 
-        self._alarm_monitor_thread = threading.Thread(
-            target=self._alarm_monitor_loop,
-            daemon=True,
-            name="SATURNAlarmMonitor",
-        )
+        if start_alarm_monitor:
+            self._alarm_monitor_running = True
 
-        self._alarm_monitor_thread.start()
+            self._alarm_monitor_thread = threading.Thread(
+                target=self._alarm_monitor_loop,
+                daemon=True,
+                name="SATURNAlarmMonitor",
+            )
+
+            self._alarm_monitor_thread.start()
 
     # ============================================================
     # CONFIGURATION

@@ -324,6 +324,30 @@ def _extract_items(text, action):
     return []
 
 
+
+def get_all_lists():
+    """
+    Return all persistent SATURN lists as structured data.
+
+    This is the public programmatic interface for consumers
+    such as the local API and PWA.
+    """
+
+    lists = _load_lists()
+
+    return {
+        "success": True,
+        "lists": [
+            {
+                "name": name,
+                "display_name": _display_name(name),
+                "items": list(items),
+            }
+            for name, items in sorted(lists.items())
+        ],
+        "error": None,
+    }
+
 def handle_list_query(text):
     """
     Handle a natural-language persistent list request.
