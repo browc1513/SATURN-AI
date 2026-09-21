@@ -1,4 +1,4 @@
-﻿const homeView = document.getElementById("home-view");
+const homeView = document.getElementById("home-view");
 const listsView = document.getElementById("lists-view");
 const alarmsView = document.getElementById("alarms-view");
 
@@ -50,6 +50,7 @@ function hideAllViews() {
     homeView.classList.add("hidden");
     listsView.classList.add("hidden");
     alarmsView.classList.add("hidden");
+    chatView.classList.add("hidden");
 }
 
 
@@ -740,6 +741,188 @@ listsBackButton.addEventListener(
 );
 
 alarmsBackButton.addEventListener(
+    "click",
+    showHome
+);
+
+
+const chatView = document.getElementById("chat-view");
+const chatButton = document.getElementById("chat-button");
+const chatBackButton = document.getElementById(
+    "chat-back-button"
+);
+const chatMessages = document.getElementById(
+    "chat-messages"
+);
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+const chatSendButton = document.getElementById(
+    "chat-send-button"
+);
+
+const SATURN_CHAT_SESSION_KEY =
+    "saturn-conversation-session-id";
+
+
+function createConversationSessionId() {
+    if (
+        window.crypto
+        && typeof window.crypto.randomUUID === "function"
+    ) {
+        return `pwa-${window.crypto.randomUUID()}`;
+    }
+
+    return (
+        `pwa-${Date.now()}-`
+        + Math.random().toString(16).slice(2)
+    );
+}
+
+
+function getConversationSessionId() {
+    let sessionId = localStorage.getItem(
+        SATURN_CHAT_SESSION_KEY
+    );
+
+    if (!sessionId || sessionId.length > 128) {
+        sessionId = createConversationSessionId();
+
+        localStorage.setItem(
+            SATURN_CHAT_SESSION_KEY,
+            sessionId
+        );
+    }
+
+    return sessionId;
+}
+
+
+function showChat() {
+    hideAllViews();
+    chatView.classList.remove("hidden");
+    chatInput.focus();
+}
+
+
+function appendChatMessage(
+    speaker,
+    message,
+    messageClass,
+) {
+    const messageElement = document.createElement("div");
+    messageElement.className =
+        `chat-message ${messageClass}`;
+
+    const speakerElement = document.createElement("strong");
+    speakerElement.textContent = speaker;
+
+    const contentElement = document.createElement("p");
+    contentElement.textContent = message;
+
+    messageElement.appendChild(speakerElement);
+    messageElement.appendChild(contentElement);
+    chatMessages.appendChild(messageElement);
+
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+
+async function sendChatMessage(message) {
+    const cleanMessage = message.trim();
+
+    if (!cleanMessage) {
+        return;
+    }
+
+    appendChatMessage(
+        "You",
+        cleanMessage,
+        "user-message",
+    );
+
+    chatSendButton.disabled = true;
+    chatInput.disabled = true;
+
+    try {
+        const response = await fetch(
+            "/api/query",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(
+                    {
+                        text: cleanMessage,
+                        session_id:
+                            getConversationSessionId(),
+                    }
+                ),
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                "SATURN query request failed."
+            );
+        }
+
+        const data = await response.json();
+        const reply = data.result?.response;
+
+        if (
+            !data.success
+            || typeof reply !== "string"
+            || !reply.trim()
+        ) {
+            throw new Error(
+                "SATURN returned an invalid response."
+            );
+        }
+
+        appendChatMessage(
+            "SATURN",
+            reply,
+            "assistant-message",
+        );
+    } catch (error) {
+        appendChatMessage(
+            "SATURN",
+            "I could not complete that request.",
+            "error-chat-message",
+        );
+    } finally {
+        chatSendButton.disabled = false;
+        chatInput.disabled = false;
+        chatInput.focus();
+    }
+}
+
+
+chatForm.addEventListener(
+    "submit",
+    async (event) => {
+        event.preventDefault();
+
+        const message = chatInput.value.trim();
+
+        if (!message) {
+            return;
+        }
+
+        chatInput.value = "";
+
+        await sendChatMessage(message);
+    }
+);
+
+
+chatButton.addEventListener(
+    "click",
+    showChat
+);
+
+chatBackButton.addEventListener(
     "click",
     showHome
 );

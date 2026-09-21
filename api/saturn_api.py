@@ -59,6 +59,47 @@ class AlarmCreateRequest(BaseModel):
     time: str
 
 
+def _make_json_safe(value):
+    """
+    Convert subsystem results into JSON-compatible values.
+
+    Some deterministic engines return objects such as SymPy numbers,
+    which FastAPI cannot serialize directly.
+    """
+
+    if value is None or isinstance(
+        value,
+        (
+            str,
+            int,
+            float,
+            bool,
+        ),
+    ):
+        return value
+
+    if isinstance(value, dict):
+        return {
+            str(key): _make_json_safe(item)
+            for key, item in value.items()
+        }
+
+    if isinstance(
+        value,
+        (
+            list,
+            tuple,
+            set,
+        ),
+    ):
+        return [
+            _make_json_safe(item)
+            for item in value
+        ]
+
+    return str(value)
+
+
 def run_saturn_query(
     text: str,
     session_id=None,
@@ -72,10 +113,12 @@ def run_saturn_query(
         )
 
     try:
-        return saturn.handle_query(
+        result = saturn.handle_query(
             text,
             session_id=session_id,
         )
+
+        return _make_json_safe(result)
     except Exception as exc:
         raise HTTPException(
             status_code=500,

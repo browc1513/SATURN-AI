@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "saturn-pwa-v1";
+const CACHE_NAME = "saturn-pwa-v2";
 
 const APP_SHELL = [
     "/",

@@ -91,3 +91,26 @@ def test_query_request_rejects_long_session_id():
             text="Hello",
             session_id="x" * 129,
         )
+
+
+def test_run_query_converts_non_json_numbers():
+    class SpecialNumber:
+        def __str__(self):
+            return "5"
+
+    with patch(
+        "api.saturn_api.saturn.handle_query",
+        return_value={
+            "success": True,
+            "domain": "math",
+            "response": "Result: 5",
+            "data": {
+                "result": SpecialNumber(),
+            },
+        },
+    ):
+        result = run_saturn_query(
+            "What is 20 divided by 4?"
+        )
+
+    assert result["data"]["result"] == "5"

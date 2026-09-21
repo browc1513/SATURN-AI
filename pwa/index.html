@@ -96,6 +96,74 @@
                     </span>
                 </button>
 
+                <button
+                    id="chat-button"
+                    class="dashboard-card"
+                    type="button"
+                >
+                    <span class="card-icon">AI</span>
+
+                    <span>
+                        <strong>Chat</strong>
+                        <small>Talk with SATURN</small>
+                    </span>
+                </button>
+
+            </section>
+        </section>
+
+        <section
+            id="chat-view"
+            class="view hidden"
+        >
+            <div class="view-heading">
+                <button
+                    id="chat-back-button"
+                    class="back-button"
+                    type="button"
+                >
+                    Back
+                </button>
+
+                <h2>Chat with SATURN</h2>
+            </div>
+
+            <section class="chat-shell">
+                <div
+                    id="chat-messages"
+                    class="chat-messages"
+                    aria-live="polite"
+                >
+                    <div class="chat-message assistant-message">
+                        <strong>SATURN</strong>
+                        <p>
+                            Hello. What would you like to talk about?
+                        </p>
+                    </div>
+                </div>
+
+                <form
+                    id="chat-form"
+                    class="chat-form"
+                >
+                    <input
+                        id="chat-input"
+                        class="chat-input"
+                        type="text"
+                        placeholder="Message SATURN..."
+                        autocomplete="off"
+                        maxlength="2000"
+                        required
+                    >
+
+                    <button
+                        id="chat-send-button"
+                        class="chat-send-button"
+                        type="submit"
+                    >
+                        Send
+                    </button>
+                </form>
             </section>
         </section>
 

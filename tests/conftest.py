@@ -1,4 +1,6 @@
-﻿import pytest
+﻿import os
+
+import pytest
 
 
 SATURN_MODEL_ENVIRONMENT_VARIABLES = (
@@ -10,21 +12,38 @@ SATURN_MODEL_ENVIRONMENT_VARIABLES = (
 )
 
 
-@pytest.fixture(autouse=True)
-def isolate_saturn_model_environment(
-    monkeypatch,
-):
+@pytest.fixture(
+    scope="session",
+    autouse=True,
+)
+def isolate_saturn_model_environment():
     """
-    Prevent per-machine model settings from changing test results.
+    Keep machine-specific model settings out of the complete test run.
 
-    Individual tests can still enable environment overrides after
-    this fixture clears the inherited host environment.
+    Session scope ensures environment isolation occurs before any
+    module-scoped SATURN fixtures are created.
     """
+
+    original_values = {
+        variable: os.environ.get(variable)
+        for variable in SATURN_MODEL_ENVIRONMENT_VARIABLES
+    }
 
     for variable in (
         SATURN_MODEL_ENVIRONMENT_VARIABLES
     ):
-        monkeypatch.delenv(
+        os.environ.pop(
             variable,
-            raising=False,
+            None,
         )
+
+    yield
+
+    for variable, value in original_values.items():
+        if value is None:
+            os.environ.pop(
+                variable,
+                None,
+            )
+        else:
+            os.environ[variable] = value
