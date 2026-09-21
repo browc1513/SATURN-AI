@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from assistant_tools.list_tool import get_all_lists
 from core.saturn_instance import get_saturn
@@ -41,6 +41,10 @@ app.mount(
 
 class QueryRequest(BaseModel):
     text: str
+    session_id: str | None = Field(
+        default=None,
+        max_length=128,
+    )
 
 
 class ListCreateRequest(BaseModel):
@@ -55,7 +59,10 @@ class AlarmCreateRequest(BaseModel):
     time: str
 
 
-def run_saturn_query(text: str):
+def run_saturn_query(
+    text: str,
+    session_id=None,
+):
     text = text.strip()
 
     if not text:
@@ -65,7 +72,10 @@ def run_saturn_query(text: str):
         )
 
     try:
-        return saturn.handle_query(text)
+        return saturn.handle_query(
+            text,
+            session_id=session_id,
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=500,
@@ -91,7 +101,8 @@ def health():
 @app.post("/api/query")
 def query_saturn(request: QueryRequest):
     result = run_saturn_query(
-        request.text
+        request.text,
+        session_id=request.session_id,
     )
 
     return {
