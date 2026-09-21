@@ -5,6 +5,9 @@ import re
 import threading
 import time
 
+from ai_models.conversation_memory import (
+    ConversationMemory,
+)
 from ai_models.ollama_client import (
     OllamaClient,
     OllamaError,
@@ -21,6 +24,9 @@ class SATURN:
         self.mode = "science"
         self.voice_enabled = False
         self.local_model = None
+        self.conversation_memory = ConversationMemory(
+            max_turns=6
+        )
 
         self.load_config(config_path)
         self._configure_local_model()
@@ -343,7 +349,11 @@ class SATURN:
     # CENTRAL LANGUAGE USER INTERFACE
     # ============================================================
 
-    def handle_query(self, text):
+    def handle_query(
+        self,
+        text,
+        session_id=None,
+    ):
         """
         Main Language User Interface entry point.
 
@@ -412,10 +422,15 @@ class SATURN:
             )
 
         return self._handle_unknown_query(
-            text
+            text,
+            session_id=session_id,
         )
 
-    def _handle_unknown_query(self, text):
+    def _handle_unknown_query(
+        self,
+        text,
+        session_id=None,
+    ):
         """
         Send otherwise-unhandled input to the optional local model.
 
@@ -438,10 +453,17 @@ class SATURN:
         if self.local_model is None:
             return fallback
 
+        conversation_history = (
+            self.conversation_memory.get_history(
+                session_id
+            )
+        )
+
         try:
             response = self.local_model.chat(
                 text,
                 system_prompt=self.local_model_system_prompt,
+                conversation_history=conversation_history,
             )
         except OllamaError as error:
             print(
@@ -449,6 +471,12 @@ class SATURN:
                 f"{error}"
             )
             return fallback
+
+        self.conversation_memory.add_exchange(
+            session_id,
+            text,
+            response,
+        )
 
         return {
             "success": True,
