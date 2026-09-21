@@ -1,9 +1,9 @@
-const CACHE_NAME = "saturn-pwa-v2";
+const CACHE_NAME = "saturn-pwa-v3";
 
 const APP_SHELL = [
     "/",
-    "/app/style.css",
-    "/app/app.js",
+    "/app/style.css?v=3",
+    "/app/app.js?v=3",
     "/app/manifest.json",
     "/app/icon-192.png",
     "/app/icon-512.png"
@@ -62,7 +62,7 @@ self.addEventListener(
         }
 
         event.respondWith(
-            fetch(event.request)
+            fetch(event.request, { cache: "no-store" })
                 .then(
                     (response) => {
                         const copy = response.clone();

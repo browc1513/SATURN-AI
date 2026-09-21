@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 PWA_DIRECTORY = Path("pwa")
@@ -53,11 +53,31 @@ def test_chat_renders_response_as_text():
     assert "innerHTML = message" not in javascript
 
 
-def test_service_worker_uses_v2_cache():
+def test_service_worker_uses_v3_cache():
     service_worker = read_pwa_file(
         "service-worker.js"
     )
 
-    assert 'CACHE_NAME = "saturn-pwa-v2"' in (
+    assert 'CACHE_NAME = "saturn-pwa-v3"' in (
         service_worker
+    )
+
+
+def test_pwa_assets_use_matching_v3_cache_urls():
+    index = Path(
+        "pwa/index.html"
+    ).read_text(encoding="utf-8")
+
+    worker = Path(
+        "pwa/service-worker.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'href="/app/style.css?v=3"' in index
+    assert 'src="/app/app.js?v=3"' in index
+    assert 'saturn-pwa-v3' in worker
+    assert '"/app/style.css?v=3"' in worker
+    assert '"/app/app.js?v=3"' in worker
+    assert (
+        'fetch(event.request, { cache: "no-store" })'
+        in worker
     )
