@@ -38,6 +38,7 @@ class OllamaClient:
         self,
         user_message,
         system_prompt=None,
+        conversation_history=None,
     ):
         if user_message is None:
             raise ValueError("A user message is required.")
@@ -46,6 +47,54 @@ class OllamaClient:
 
         if not user_message:
             raise ValueError("A user message is required.")
+
+        if conversation_history is None:
+            conversation_history = []
+
+        if not isinstance(
+            conversation_history,
+            (list, tuple),
+        ):
+            raise ValueError(
+                "Conversation history must be a list or tuple."
+            )
+
+        validated_history = []
+
+        for message in conversation_history:
+            if not isinstance(message, dict):
+                raise ValueError(
+                    "Each history message must be a dictionary."
+                )
+
+            role = str(
+                message.get("role", "")
+            ).strip().lower()
+
+            if role not in {
+                "user",
+                "assistant",
+            }:
+                raise ValueError(
+                    "History message role must be "
+                    "'user' or 'assistant'."
+                )
+
+            content = str(
+                message.get("content", "")
+            ).strip()
+
+            if not content:
+                raise ValueError(
+                    "History message content is required."
+                )
+
+            validated_history.append(
+                {
+                    "role": role,
+                    "content": content,
+                }
+            )
 
         messages = []
 
@@ -56,6 +105,8 @@ class OllamaClient:
                     "content": str(system_prompt).strip(),
                 }
             )
+
+        messages.extend(validated_history)
 
         messages.append(
             {

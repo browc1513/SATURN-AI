@@ -140,3 +140,103 @@ def test_ollama_chat_rejects_empty_user_message(
         match="user message",
     ):
         client.chat(message)
+
+
+def test_ollama_chat_includes_conversation_history():
+    client = OllamaClient(
+        model="test-model"
+    )
+
+    history = [
+        {
+            "role": "user",
+            "content": "My name is Colin.",
+        },
+        {
+            "role": "assistant",
+            "content": "Nice to meet you, Colin.",
+        },
+    ]
+    original_history = [
+        dict(message)
+        for message in history
+    ]
+
+    fake_response = FakeResponse(
+        {
+            "message": {
+                "role": "assistant",
+                "content": "Your name is Colin.",
+            }
+        }
+    )
+
+    with patch(
+        "ai_models.ollama_client.urlopen",
+        return_value=fake_response,
+    ) as mocked_urlopen:
+        result = client.chat(
+            "What is my name?",
+            system_prompt="You are SATURN.",
+            conversation_history=history,
+        )
+
+    request = mocked_urlopen.call_args.args[0]
+    payload = json.loads(
+        request.data.decode("utf-8")
+    )
+
+    assert result == "Your name is Colin."
+    assert payload["messages"] == [
+        {
+            "role": "system",
+            "content": "You are SATURN.",
+        },
+        {
+            "role": "user",
+            "content": "My name is Colin.",
+        },
+        {
+            "role": "assistant",
+            "content": "Nice to meet you, Colin.",
+        },
+        {
+            "role": "user",
+            "content": "What is my name?",
+        },
+    ]
+    assert history == original_history
+
+
+@pytest.mark.parametrize(
+    "history",
+    [
+        "not-a-list",
+        [None],
+        [{"content": "Missing role"}],
+        [
+            {
+                "role": "system",
+                "content": "Not permitted",
+            }
+        ],
+        [
+            {
+                "role": "user",
+                "content": "   ",
+            }
+        ],
+    ],
+)
+def test_ollama_chat_rejects_invalid_history(
+    history,
+):
+    client = OllamaClient(
+        model="test-model"
+    )
+
+    with pytest.raises(ValueError):
+        client.chat(
+            "Hello",
+            conversation_history=history,
+        )
