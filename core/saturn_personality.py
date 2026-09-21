@@ -96,15 +96,47 @@ class SATURN:
 
         config = self.local_model_config
 
-        self.local_model_enabled = bool(
-            config.get("enabled", False)
+        enabled_override = os.environ.get(
+            "SATURN_LOCAL_MODEL_ENABLED"
         )
 
+        if enabled_override is None:
+            self.local_model_enabled = bool(
+                config.get("enabled", False)
+            )
+        else:
+            normalized_enabled = (
+                enabled_override.strip().lower()
+            )
+
+            if normalized_enabled in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }:
+                self.local_model_enabled = True
+            elif normalized_enabled in {
+                "0",
+                "false",
+                "no",
+                "off",
+            }:
+                self.local_model_enabled = False
+            else:
+                raise ValueError(
+                    "SATURN_LOCAL_MODEL_ENABLED must be "
+                    "true or false."
+                )
+
         self.local_model_system_prompt = str(
-            config.get(
-                "system_prompt",
-                "You are S.A.T.U.R.N., a friendly, intelligent, "
-                "concise personal assistant.",
+            os.environ.get(
+                "SATURN_LOCAL_MODEL_SYSTEM_PROMPT",
+                config.get(
+                    "system_prompt",
+                    "You are S.A.T.U.R.N., a friendly, "
+                    "intelligent, concise personal assistant.",
+                ),
             )
         ).strip()
 
@@ -121,16 +153,38 @@ class SATURN:
                 f"Unsupported local model provider: {provider}"
             )
 
-        self.local_model = OllamaClient(
-            model=config.get("model", ""),
-            base_url=config.get(
+        model = os.environ.get(
+            "SATURN_LOCAL_MODEL_NAME",
+            config.get("model", ""),
+        )
+
+        base_url = os.environ.get(
+            "SATURN_LOCAL_MODEL_URL",
+            config.get(
                 "base_url",
                 "http://127.0.0.1:11434",
             ),
-            timeout=config.get(
-                "timeout_seconds",
-                60,
-            ),
+        )
+
+        timeout = float(
+            os.environ.get(
+                "SATURN_LOCAL_MODEL_TIMEOUT",
+                config.get(
+                    "timeout_seconds",
+                    60,
+                ),
+            )
+        )
+
+        if timeout <= 0:
+            raise ValueError(
+                "Local model timeout must be positive."
+            )
+
+        self.local_model = OllamaClient(
+            model=model,
+            base_url=base_url,
+            timeout=timeout,
         )
 
     # ============================================================

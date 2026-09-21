@@ -142,3 +142,69 @@ def test_model_failure_preserves_unknown_fallback(
     assert "not sure which subsystem" in (
         result["response"]
     )
+
+
+def test_environment_can_enable_local_model(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "SATURN_LOCAL_MODEL_ENABLED",
+        "true",
+    )
+    monkeypatch.setenv(
+        "SATURN_LOCAL_MODEL_NAME",
+        "qwen3:8b",
+    )
+
+    with patch.object(
+        OllamaClient,
+        "chat",
+        return_value="Environment model response.",
+    ) as mocked_chat:
+        saturn = SATURN(
+            start_alarm_monitor=False
+        )
+
+        result = saturn.handle_query(
+            "Paint the moon purple"
+        )
+
+    assert saturn.local_model_enabled is True
+    assert saturn.local_model.model == "qwen3:8b"
+    assert result["success"] is True
+    assert result["domain"] == "conversation"
+    mocked_chat.assert_called_once()
+
+
+def test_environment_can_force_model_disabled(
+    tmp_path,
+    monkeypatch,
+):
+    config_path = create_config(
+        tmp_path,
+        enabled=True,
+    )
+
+    monkeypatch.setenv(
+        "SATURN_LOCAL_MODEL_ENABLED",
+        "false",
+    )
+
+    with patch.object(
+        OllamaClient,
+        "chat",
+    ) as mocked_chat:
+        saturn = SATURN(
+            config_path=str(config_path),
+            start_alarm_monitor=False,
+        )
+
+        result = saturn.handle_query(
+            "Paint the moon purple"
+        )
+
+    assert saturn.local_model_enabled is False
+    assert saturn.local_model is None
+    assert result["success"] is False
+    assert result["domain"] == "unknown"
+    mocked_chat.assert_not_called()
