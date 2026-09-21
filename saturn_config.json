@@ -27,6 +27,14 @@
       "trigger": "Enter Chill Mode"
     }
   },
+  "local_model": {
+    "enabled": false,
+    "provider": "ollama",
+    "model": "",
+    "base_url": "http://127.0.0.1:11434",
+    "timeout_seconds": 60,
+    "system_prompt": "You are S.A.T.U.R.N., a friendly, intelligent, concise personal assistant."
+  },
   "pop_culture_references": {
     "tv_shows": [
       "Scrubs", "Brooklyn Nine-Nine", "Gilmore Girls", "Futurama",

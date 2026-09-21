@@ -5,6 +5,11 @@ import re
 import threading
 import time
 
+from ai_models.ollama_client import (
+    OllamaClient,
+    OllamaError,
+)
+
 
 class SATURN:
     def __init__(
@@ -15,8 +20,10 @@ class SATURN:
         self.name = "S.A.T.U.R.N."
         self.mode = "science"
         self.voice_enabled = False
+        self.local_model = None
 
         self.load_config(config_path)
+        self._configure_local_model()
 
         # Alarm monitoring is enabled by default so existing SATURN
         # interfaces retain their current behavior. Interfaces that
@@ -72,6 +79,58 @@ class SATURN:
         self.reference_frequency = config.get(
             "reference_frequency",
             "occasional"
+        )
+
+        self.local_model_config = config.get(
+            "local_model",
+            {},
+        )
+
+    def _configure_local_model(self):
+        """
+        Configure the optional local conversational model.
+
+        The model is disabled unless explicitly enabled in SATURN's
+        configuration, preserving all Version 1 behavior by default.
+        """
+
+        config = self.local_model_config
+
+        self.local_model_enabled = bool(
+            config.get("enabled", False)
+        )
+
+        self.local_model_system_prompt = str(
+            config.get(
+                "system_prompt",
+                "You are S.A.T.U.R.N., a friendly, intelligent, "
+                "concise personal assistant.",
+            )
+        ).strip()
+
+        if not self.local_model_enabled:
+            self.local_model = None
+            return
+
+        provider = str(
+            config.get("provider", "ollama")
+        ).strip().lower()
+
+        if provider != "ollama":
+            raise ValueError(
+                f"Unsupported local model provider: {provider}"
+            )
+
+        self.local_model = OllamaClient(
+            model=config.get("model", ""),
+            base_url=config.get(
+                "base_url",
+                "http://127.0.0.1:11434",
+            ),
+            timeout=config.get(
+                "timeout_seconds",
+                60,
+            ),
         )
 
     # ============================================================
@@ -298,15 +357,53 @@ class SATURN:
                 text
             )
 
-        return {
+        return self._handle_unknown_query(
+            text
+        )
+
+    def _handle_unknown_query(self, text):
+        """
+        Send otherwise-unhandled input to the optional local model.
+
+        If the model is disabled or unavailable, preserve SATURN's
+        original deterministic fallback response.
+        """
+
+        fallback = {
             "success": False,
             "domain": "unknown",
             "response": (
                 "I'm not sure which subsystem should handle "
                 "that request yet. Right now I can automatically "
-                "route mathematical, veterinary, time, weather, list, and alarm queries."
+                "route mathematical, veterinary, time, weather, "
+                "list, and alarm queries."
             ),
             "data": None,
+        }
+
+        if self.local_model is None:
+            return fallback
+
+        try:
+            response = self.local_model.chat(
+                text,
+                system_prompt=self.local_model_system_prompt,
+            )
+        except OllamaError as error:
+            print(
+                "S.A.T.U.R.N. local model warning: "
+                f"{error}"
+            )
+            return fallback
+
+        return {
+            "success": True,
+            "domain": "conversation",
+            "response": response,
+            "data": {
+                "provider": "ollama",
+                "model": self.local_model.model,
+            },
         }
 
     # ============================================================
