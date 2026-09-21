@@ -472,6 +472,7 @@ class SATURN:
 
         list_keywords = [
             "list",
+            "lists",
             "grocery list",
             "shopping list",
             "todo list",
@@ -520,11 +521,15 @@ class SATURN:
             # Arithmetic
             "add",
             "sum",
+            "plus",
             "subtract",
             "difference",
+            "minus",
             "multiply",
             "product",
+            "times",
             "divide",
+            "divided by",
             "quotient",
             "percentage",
             "percent",

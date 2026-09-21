@@ -25,6 +25,9 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import subprocess
 
+from functools import wraps
+from assistant_tools.storage_tool import atomic_save_json, storage_transaction
+
 try:
     import winsound
 except ImportError:
@@ -51,67 +54,29 @@ DEFAULT_TIMEZONE = "America/Detroit"
 
 
 def _ensure_storage():
-    os.makedirs(
-        DATA_DIR,
-        exist_ok=True,
-    )
+    os.makedirs(DATA_DIR, exist_ok=True)
 
-    if not os.path.exists(
-        ALARMS_FILE
-    ):
-        with open(
-            ALARMS_FILE,
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                [],
-                file,
-                indent=2,
-            )
+    if not os.path.exists(ALARMS_FILE):
+        atomic_save_json(ALARMS_FILE, [])
 
 
 def _load_alarms():
     _ensure_storage()
 
     try:
-        with open(
-            ALARMS_FILE,
-            "r",
-            encoding="utf-8",
-        ) as file:
-            data = json.load(
-                file
-            )
-    except (
-        json.JSONDecodeError,
-        OSError,
-    ):
+        with open(ALARMS_FILE, "r", encoding="utf-8") as file:
+            data = json.load(file)
+    except (json.JSONDecodeError, OSError):
         data = []
 
-    if not isinstance(
-        data,
-        list,
-    ):
+    if not isinstance(data, list):
         data = []
 
     return data
 
 
 def _save_alarms(alarms):
-    _ensure_storage()
-
-    with open(
-        ALARMS_FILE,
-        "w",
-        encoding="utf-8",
-    ) as file:
-        json.dump(
-            alarms,
-            file,
-            indent=2,
-            ensure_ascii=False,
-        )
+    atomic_save_json(ALARMS_FILE, alarms)
 
 
 def _now():
@@ -377,6 +342,16 @@ def _find_alarm_to_cancel(text, alarms):
     return None
 
 
+def _locked_alarm_operation(function):
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        with storage_transaction(ALARMS_FILE):
+            return function(*args, **kwargs)
+
+    return wrapper
+
+
+@_locked_alarm_operation
 def handle_alarm_query(text):
     """
     Handle a natural-language alarm request.
@@ -692,6 +667,7 @@ def play_alarm_sound(repetitions=5):
 
     return True
 
+@_locked_alarm_operation
 def check_due_alarms(mark_fired=True):
     """
     Return alarms that are due now or overdue.

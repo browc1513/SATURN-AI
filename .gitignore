@@ -169,3 +169,15 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# SATURN local storage lock and temporary files
+data/*.lock
+data/*.tmp
+data/*.json.*.tmp
+
+# SATURN runtime data stays local to each machine
+/data/saturn_lists.json
+/data/saturn_alarms.json
+
+# Locally installed Piper voice models
+/voice/models/piper/

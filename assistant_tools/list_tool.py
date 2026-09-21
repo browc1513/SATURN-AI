@@ -17,6 +17,9 @@ import json
 import os
 import re
 
+from functools import wraps
+from assistant_tools.storage_tool import atomic_save_json, storage_transaction
+
 
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(
@@ -36,68 +39,29 @@ LISTS_FILE = os.path.join(
 
 
 def _ensure_storage():
-    os.makedirs(
-        DATA_DIR,
-        exist_ok=True,
-    )
+    os.makedirs(DATA_DIR, exist_ok=True)
 
-    if not os.path.exists(
-        LISTS_FILE
-    ):
-        with open(
-            LISTS_FILE,
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                {},
-                file,
-                indent=2,
-            )
+    if not os.path.exists(LISTS_FILE):
+        atomic_save_json(LISTS_FILE, {})
 
 
 def _load_lists():
     _ensure_storage()
 
     try:
-        with open(
-            LISTS_FILE,
-            "r",
-            encoding="utf-8",
-        ) as file:
-            data = json.load(
-                file
-            )
-
-    except (
-        json.JSONDecodeError,
-        OSError,
-    ):
+        with open(LISTS_FILE, "r", encoding="utf-8") as file:
+            data = json.load(file)
+    except (json.JSONDecodeError, OSError):
         data = {}
 
-    if not isinstance(
-        data,
-        dict,
-    ):
+    if not isinstance(data, dict):
         data = {}
 
     return data
 
 
 def _save_lists(data):
-    _ensure_storage()
-
-    with open(
-        LISTS_FILE,
-        "w",
-        encoding="utf-8",
-    ) as file:
-        json.dump(
-            data,
-            file,
-            indent=2,
-            ensure_ascii=False,
-        )
+    atomic_save_json(LISTS_FILE, data)
 
 
 def _normalize_list_name(name):
@@ -200,6 +164,9 @@ def _extract_list_name(text, action=None):
 
     elif action == "create":
         patterns = [
+            r"\b(?:create|make)\s+"
+            r"(?:a\s+|my\s+|the\s+)?list\s+"
+            r"(?:called\s+|named\s+)?(.+?)(?:[.!?]|$)",
             r"\b(?:create|make)\s+"
             r"(?:a\s+|my\s+|the\s+)?(.+?)\s+list\b",
         ]
@@ -325,6 +292,16 @@ def _extract_items(text, action):
 
 
 
+def _locked_list_operation(function):
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        with storage_transaction(LISTS_FILE):
+            return function(*args, **kwargs)
+
+    return wrapper
+
+
+@_locked_list_operation
 def get_all_lists():
     """
     Return all persistent SATURN lists as structured data.
@@ -348,6 +325,7 @@ def get_all_lists():
         "error": None,
     }
 
+@_locked_list_operation
 def handle_list_query(text):
     """
     Handle a natural-language persistent list request.
@@ -356,6 +334,38 @@ def handle_list_query(text):
     action = _detect_action(
         text
     )
+
+    if re.search(
+        r"\b(?:what\s+lists\s+do\s+i\s+have|"
+        r"(?:show|list|tell)\s+(?:me\s+)?(?:all\s+)?"
+        r"(?:my\s+|the\s+)?lists|"
+        r"what\s+are\s+(?:all\s+)?(?:my\s+|the\s+)?lists)\b",
+        str(text),
+        flags=re.IGNORECASE,
+    ):
+        lists = _load_lists()
+        names = sorted(lists)
+        if names:
+            response = "Your lists are: " + ", ".join(
+                _display_name(name) for name in names
+            ) + "."
+        else:
+            response = "You don't have any lists yet."
+
+        return {
+            "success": True,
+            "action": "show_all",
+            "lists": [
+                {
+                    "name": name,
+                    "display_name": _display_name(name),
+                    "items": list(lists[name]),
+                }
+                for name in names
+            ],
+            "response": response,
+            "error": None,
+        }
 
     list_name = _extract_list_name(
         text,

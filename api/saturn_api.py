@@ -23,6 +23,15 @@ saturn = get_saturn(start_alarm_monitor=False)
 
 PWA_DIR = Path(__file__).resolve().parent.parent / "pwa"
 
+@app.get("/app/service-worker.js")
+def service_worker():
+    return FileResponse(
+        PWA_DIR / "service-worker.js",
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )
+
+
 app.mount(
     "/app",
     StaticFiles(directory=PWA_DIR),
