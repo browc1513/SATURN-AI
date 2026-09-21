@@ -9,6 +9,7 @@ from voice.wake_word import (
 
 
 ACKNOWLEDGEMENT = "Yes?"
+VOICE_SESSION_ID = "voice"
 
 
 def main():
@@ -115,7 +116,8 @@ def main():
             # 6. Route through SATURN
             # --------------------------------------------------
             result = saturn.handle_query(
-                command
+                command,
+                session_id=VOICE_SESSION_ID,
             )
 
             response = result.get(
