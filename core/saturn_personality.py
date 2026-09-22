@@ -8,6 +8,9 @@ import time
 from ai_models.conversation_memory import (
     ConversationMemory,
 )
+from assistant_tools.reboot_control import (
+    RebootController,
+)
 from ai_models.ollama_client import (
     OllamaClient,
     OllamaError,
@@ -27,6 +30,7 @@ class SATURN:
         self.conversation_memory = ConversationMemory(
             max_turns=6
         )
+        self.reboot_controller = RebootController()
 
         self.load_config(config_path)
         self._configure_local_model()
@@ -399,6 +403,136 @@ class SATURN:
             normalized_control,
         )
 
+        reboot_request_commands = {
+            "reboot saturn",
+            "restart saturn",
+            "reboot the pi",
+            "restart the pi",
+            "reboot raspberry pi",
+            "restart raspberry pi",
+            "reboot yourself",
+        }
+
+        reboot_confirmation_commands = {
+            "confirm reboot",
+            "confirm restart",
+        }
+
+        reboot_cancellation_commands = {
+            "cancel reboot",
+            "cancel restart",
+        }
+
+        if (
+            normalized_control
+            in reboot_request_commands
+        ):
+            request = (
+                self.reboot_controller.request_confirmation(
+                    session_id
+                )
+            )
+
+            if request["status"] == "disabled":
+                return {
+                    "success": False,
+                    "domain": "control",
+                    "response": (
+                        "Reboot control is not enabled "
+                        "on this device."
+                    ),
+                    "data": {
+                        "action": "reboot_disabled",
+                    },
+                }
+
+            return {
+                "success": True,
+                "domain": "control",
+                "response": (
+                    "Reboot requested. Say confirm reboot "
+                    "within 30 seconds."
+                ),
+                "data": {
+                    "action": "reboot_requested",
+                    "expires_in_seconds": request[
+                        "expires_in_seconds"
+                    ],
+                },
+            }
+
+        if (
+            normalized_control
+            in reboot_confirmation_commands
+        ):
+            confirmation = (
+                self.reboot_controller.confirm(
+                    session_id
+                )
+            )
+
+            if confirmation["status"] == "confirmed":
+                self.reboot_controller.schedule_reboot()
+
+                return {
+                    "success": True,
+                    "domain": "control",
+                    "response": (
+                        "Reboot confirmed. SATURN will "
+                        "restart in five seconds."
+                    ),
+                    "data": {
+                        "action": "reboot_confirmed",
+                        "delay_seconds": 5,
+                    },
+                }
+
+            if confirmation["status"] == "expired":
+                response = (
+                    "The reboot confirmation expired. "
+                    "Request a reboot again."
+                )
+                action = "reboot_expired"
+            else:
+                response = (
+                    "There is no pending reboot request."
+                )
+                action = "reboot_not_pending"
+
+            return {
+                "success": False,
+                "domain": "control",
+                "response": response,
+                "data": {
+                    "action": action,
+                },
+            }
+
+        if (
+            normalized_control
+            in reboot_cancellation_commands
+        ):
+            cancelled = self.reboot_controller.cancel(
+                session_id
+            )
+
+            return {
+                "success": cancelled,
+                "domain": "control",
+                "response": (
+                    "Reboot cancelled."
+                    if cancelled
+                    else "There is no pending reboot request."
+                ),
+                "data": {
+                    "action": (
+                        "reboot_cancelled"
+                        if cancelled
+                        else "reboot_not_pending"
+                    ),
+                },
+            }
+
         cancel_interaction_commands = {
             "never mind",
             "nevermind",
@@ -413,12 +547,26 @@ class SATURN:
             normalized_control
             in cancel_interaction_commands
         ):
+            reboot_cancelled = (
+                self.reboot_controller.cancel(
+                    session_id
+                )
+            )
+
             return {
                 "success": True,
                 "domain": "control",
-                "response": "Okay.",
+                "response": (
+                    "Okay, reboot cancelled."
+                    if reboot_cancelled
+                    else "Okay."
+                ),
                 "data": {
-                    "action": "cancel_interaction",
+                    "action": (
+                        "reboot_cancelled"
+                        if reboot_cancelled
+                        else "cancel_interaction"
+                    ),
                 },
             }
 

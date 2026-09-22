@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 import pytest
 
@@ -9,6 +9,7 @@ SATURN_MODEL_ENVIRONMENT_VARIABLES = (
     "SATURN_LOCAL_MODEL_URL",
     "SATURN_LOCAL_MODEL_TIMEOUT",
     "SATURN_LOCAL_MODEL_SYSTEM_PROMPT",
+    "SATURN_REBOOT_ENABLED",
 )
 
 
