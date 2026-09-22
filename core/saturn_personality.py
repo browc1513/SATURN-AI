@@ -539,6 +539,33 @@ class SATURN:
         # Veterinary routing
         # --------------------------------------------------------
 
+        # Explicit list operations must take priority over
+        # keywords belonging to other domains. For example,
+        # "add chicken to my grocery list" is a list command,
+        # not a veterinary query.
+        explicit_list_patterns = [
+            r"\bcreate\s+(?:a\s+|my\s+)?[a-z0-9 _-]*list\b",
+            r"\bmake\s+(?:a\s+|my\s+)?[a-z0-9 _-]*list\b",
+            r"\bshow\s+(?:me\s+)?(?:my\s+)?"
+            r"[a-z0-9 _-]*list\b",
+            r"\bwhat(?:['?]s| is)\s+on\s+"
+            r"(?:my\s+|the\s+|a\s+)?"
+            r"[a-z0-9 _-]+\s+list\b",
+            r"\badd\b.+\bto\b.+\blist\b",
+            r"\bremove\b.+\bfrom\b.+\blist\b",
+            r"\bdelete\b.+\bfrom\b.+\blist\b",
+            r"\bclear\b.+\blist\b",
+        ]
+
+        if any(
+            re.search(
+                pattern,
+                normalized,
+            )
+            for pattern in explicit_list_patterns
+        ):
+            return "lists"
+
         veterinary_keywords = [
             "vet",
             "veterinary",

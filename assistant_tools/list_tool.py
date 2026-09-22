@@ -178,10 +178,19 @@ def _extract_list_name(text, action=None):
             "delete": r"delete",
         }[action]
 
-        patterns = [
+        patterns = []
+
+        if action == "show":
+            patterns.append(
+                r"\bwhat(?:['?]s| is)\s+on\s+"
+                r"(?:my\s+|the\s+|a\s+)?"
+                r"(.+?)\s+list\b"
+            )
+
+        patterns.append(
             rf"\b{action_word}\s+(?:me\s+)?"
-            rf"(?:my\s+|the\s+|a\s+)?(.+?)\s+list\b",
-        ]
+            rf"(?:my\s+|the\s+|a\s+)?(.+?)\s+list\b"
+        )
 
     # General fallback for simple phrases.
     patterns.extend(
@@ -253,7 +262,7 @@ def _detect_action(text):
         return "delete"
 
     if re.search(
-        r"\b(?:show|view|open|what(?:'s| is) on)\b",
+        r"\b(?:show|view|open|what(?:['?]s| is) on)\b",
         normalized,
     ):
         return "show"
