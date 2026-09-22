@@ -642,6 +642,20 @@ class SATURN:
         # Alarm routing
         # --------------------------------------------------------
 
+        bare_stop_commands = {
+            "stop",
+            "dismiss",
+            "silence",
+        }
+
+        if normalized in bare_stop_commands:
+            from assistant_tools.alarm_playback import (
+                is_alarm_ringing,
+            )
+
+            if is_alarm_ringing():
+                return "alarms"
+
         alarm_keywords = [
             "alarm",
             "alarms",
@@ -655,6 +669,9 @@ class SATURN:
             r"\bdelete\s+(?:my\s+)?alarm\b",
             r"\bshow\s+(?:me\s+)?(?:my\s+)?alarms?\b",
             r"\blist\s+(?:my\s+)?alarms?\b",
+            r"\b(?:stop|dismiss|silence)"
+            r"(?:\s+(?:the\s+|my\s+)?)?"
+            r"(?:ringing\s+)?alarms?\b",
         ]
 
         if (

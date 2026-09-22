@@ -26,6 +26,12 @@ from zoneinfo import ZoneInfo
 import subprocess
 
 from functools import wraps
+from assistant_tools.alarm_playback import (
+    begin_alarm_playback,
+    finish_alarm_playback,
+    should_stop_alarm_playback,
+    stop_alarm_playback,
+)
 from assistant_tools.storage_tool import atomic_save_json, storage_transaction
 
 try:
@@ -251,6 +257,18 @@ def _detect_action(text):
     normalized = str(text).lower()
 
     if re.search(
+        r"\b(?:stop|dismiss|silence)"
+        r"(?:\s+(?:the\s+|my\s+)?)?"
+        r"(?:ringing\s+)?alarms?\b",
+        normalized,
+    ) or normalized.strip() in {
+        "stop",
+        "dismiss",
+        "silence",
+    }:
+        return "stop"
+
+    if re.search(
         r"\b(?:cancel|delete|remove)\b",
         normalized,
     ):
@@ -362,6 +380,25 @@ def handle_alarm_query(text):
     )
 
     alarms = _load_alarms()
+
+    # --------------------------------------------------------
+    # STOP CURRENTLY RINGING ALARM
+    # --------------------------------------------------------
+
+    if action == "stop":
+        stopped = stop_alarm_playback()
+
+        return {
+            "success": True,
+            "action": action,
+            "stopped": stopped,
+            "response": (
+                "Alarm stopped."
+                if stopped
+                else "No alarm is currently ringing."
+            ),
+            "error": None,
+        }
 
     # --------------------------------------------------------
     # SET
@@ -583,16 +620,61 @@ def handle_alarm_query(text):
     }
 
 
+def _wait_for_alarm_interval(
+    playback_generation,
+    duration,
+    interval=0.05,
+):
+    """
+    Wait briefly while checking for a cross-process stop request.
+    """
+
+    deadline = time.monotonic() + duration
+
+    while time.monotonic() < deadline:
+        if should_stop_alarm_playback(
+            playback_generation
+        ):
+            return False
+
+        time.sleep(
+            min(
+                interval,
+                max(
+                    0,
+                    deadline - time.monotonic(),
+                ),
+            )
+        )
+
+    return not should_stop_alarm_playback(
+        playback_generation
+    )
+
+
+def _stop_linux_sound_process(process):
+    if process.poll() is not None:
+        return
+
+    process.terminate()
+
+    try:
+        process.wait(
+            timeout=1
+        )
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(
+            timeout=1
+        )
+
+
 def play_alarm_sound(repetitions=5):
     """
-    Play SATURN's alarm sound.
+    Play SATURN's interruptible alarm sound.
 
-    On Windows, use the configured Microsoft Windows System Alarm.
-
-    On Linux, play an audible sine-wave alarm through the system's
-    default audio output. This allows PipeWire/WirePlumber to route
-    the alarm to the active SATURN speaker, such as the Jabra
-    SPEAK 510 USB.
+    Playback state is shared across processes so the API or voice
+    service can dismiss an alarm owned by the voice runtime.
     """
 
     repetitions = max(
@@ -600,72 +682,133 @@ def play_alarm_sound(repetitions=5):
         int(repetitions),
     )
 
-    if (
-        sys.platform.startswith("win")
-        and winsound is not None
-    ):
-        for _ in range(repetitions):
+    playback_generation = (
+        begin_alarm_playback()
+    )
+
+    try:
+        if (
+            sys.platform.startswith("win")
+            and winsound is not None
+        ):
+            for _ in range(repetitions):
+                if should_stop_alarm_playback(
+                    playback_generation
+                ):
+                    break
+
+                try:
+                    winsound.PlaySound(
+                        "SystemAlarm",
+                        winsound.SND_ALIAS
+                        | winsound.SND_ASYNC,
+                    )
+                except RuntimeError:
+                    winsound.MessageBeep(
+                        winsound.MB_ICONEXCLAMATION
+                    )
+
+                if not _wait_for_alarm_interval(
+                    playback_generation,
+                    1,
+                ):
+                    break
+
             try:
                 winsound.PlaySound(
-                    "SystemAlarm",
-                    winsound.SND_ALIAS,
+                    None,
+                    winsound.SND_PURGE,
                 )
             except RuntimeError:
-                winsound.MessageBeep(
-                    winsound.MB_ICONEXCLAMATION
-                )
+                pass
 
-            time.sleep(
-                0.15
-            )
+            return True
 
-        return True
+        if sys.platform.startswith("linux"):
+            for _ in range(repetitions):
+                if should_stop_alarm_playback(
+                    playback_generation
+                ):
+                    break
 
-    if sys.platform.startswith("linux"):
+                try:
+                    process = subprocess.Popen(
+                        [
+                            "speaker-test",
+                            "-t",
+                            "sine",
+                            "-f",
+                            "880",
+                            "-l",
+                            "1",
+                        ],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+
+                    deadline = (
+                        time.monotonic() + 3
+                    )
+
+                    while (
+                        process.poll() is None
+                        and time.monotonic() < deadline
+                    ):
+                        if should_stop_alarm_playback(
+                            playback_generation
+                        ):
+                            _stop_linux_sound_process(
+                                process
+                            )
+                            break
+
+                        time.sleep(
+                            0.05
+                        )
+
+                    if process.poll() is None:
+                        _stop_linux_sound_process(
+                            process
+                        )
+
+                except OSError:
+                    print(
+                        "\a",
+                        end="",
+                        flush=True,
+                    )
+
+                if not _wait_for_alarm_interval(
+                    playback_generation,
+                    0.15,
+                ):
+                    break
+
+            return True
+
         for _ in range(repetitions):
-            try:
-                subprocess.run(
-                    [
-                        "speaker-test",
-                        "-t",
-                        "sine",
-                        "-f",
-                        "880",
-                        "-l",
-                        "1",
-                    ],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    check=False,
-                    timeout=3,
-                )
-            except (
-                OSError,
-                subprocess.TimeoutExpired,
+            if should_stop_alarm_playback(
+                playback_generation
             ):
-                print(
-                    "\a",
-                    end="",
-                    flush=True,
-                )
+                break
 
-            time.sleep(
-                0.15
+            print(
+                "\a",
+                end="",
+                flush=True,
             )
+
+            if not _wait_for_alarm_interval(
+                playback_generation,
+                0.5,
+            ):
+                break
 
         return True
 
-    for _ in range(repetitions):
-        print(
-            "\a",
-            end="",
-            flush=True,
-        )
-        time.sleep(
-            0.5
-        )
+    finally:
+        finish_alarm_playback()
 
-    return True
 
 @_locked_alarm_operation
 def check_due_alarms(mark_fired=True):
