@@ -387,6 +387,41 @@ class SATURN:
                 "data": None,
             }
 
+        normalized_control = re.sub(
+            r"[.!?]+$",
+            "",
+            text.lower(),
+        ).strip()
+
+        normalized_control = re.sub(
+            r"\s+",
+            " ",
+            normalized_control,
+        )
+
+        cancel_interaction_commands = {
+            "never mind",
+            "nevermind",
+            "forget it",
+            "disregard that",
+            "cancel that",
+            "never mind saturn",
+            "nevermind saturn",
+        }
+
+        if (
+            normalized_control
+            in cancel_interaction_commands
+        ):
+            return {
+                "success": True,
+                "domain": "control",
+                "response": "Okay.",
+                "data": {
+                    "action": "cancel_interaction",
+                },
+            }
+
         domain = self._detect_domain(
             text
         )
