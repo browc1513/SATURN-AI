@@ -1,4 +1,4 @@
-﻿import json
+import json
 
 import pytest
 
@@ -214,3 +214,187 @@ def test_playback_state_is_valid_json(
 
     assert state["active_count"] == 0
     assert state["generation"] == 1
+
+
+class FakeLinuxSoundProcess:
+    def __init__(
+        self,
+        *,
+        running=True,
+        time_out_once=False,
+    ):
+        self.pid = 12345
+        self.running = running
+        self.time_out_once = time_out_once
+        self.wait_calls = 0
+        self.terminate_calls = 0
+        self.kill_calls = 0
+
+    def poll(self):
+        if self.running:
+            return None
+
+        return 0
+
+    def wait(self, timeout):
+        self.wait_calls += 1
+
+        if (
+            self.time_out_once
+            and self.wait_calls == 1
+        ):
+            raise alarm_tool.subprocess.TimeoutExpired(
+                cmd="speaker-test",
+                timeout=timeout,
+            )
+
+        self.running = False
+        return 0
+
+    def terminate(self):
+        self.terminate_calls += 1
+        self.running = False
+
+    def kill(self):
+        self.kill_calls += 1
+        self.running = False
+
+
+def test_linux_alarm_starts_in_new_process_group(
+    isolated_alarm_files,
+    monkeypatch,
+):
+    process = FakeLinuxSoundProcess(
+        running=False
+    )
+    popen_calls = []
+
+    def fake_popen(
+        command,
+        **kwargs,
+    ):
+        popen_calls.append(
+            (
+                command,
+                kwargs,
+            )
+        )
+
+        return process
+
+    monkeypatch.setattr(
+        alarm_tool.sys,
+        "platform",
+        "linux",
+    )
+    monkeypatch.setattr(
+        alarm_tool.subprocess,
+        "Popen",
+        fake_popen,
+    )
+
+    result = alarm_tool.play_alarm_sound(
+        repetitions=1
+    )
+
+    assert result is True
+    assert len(popen_calls) == 1
+
+    command, kwargs = popen_calls[0]
+
+    assert command[0] == "speaker-test"
+    assert kwargs["start_new_session"] is True
+
+
+def test_linux_alarm_stop_terminates_process_group(
+    monkeypatch,
+):
+    process = FakeLinuxSoundProcess()
+    sent_signals = []
+
+    monkeypatch.setattr(
+        alarm_tool.os,
+        "getpgid",
+        lambda process_id: 54321,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        alarm_tool.os,
+        "killpg",
+        lambda process_group, process_signal: (
+            sent_signals.append(
+                (
+                    process_group,
+                    process_signal,
+                )
+            )
+        ),
+        raising=False,
+    )
+
+    alarm_tool._stop_linux_sound_process(
+        process
+    )
+
+    assert sent_signals == [
+        (
+            54321,
+            alarm_tool.signal.SIGTERM,
+        )
+    ]
+    assert process.terminate_calls == 0
+    assert process.kill_calls == 0
+
+
+def test_linux_alarm_force_kills_process_group(
+    monkeypatch,
+):
+    process = FakeLinuxSoundProcess(
+        time_out_once=True
+    )
+    sent_signals = []
+
+    # Windows does not define SIGKILL. Supply its Linux value so
+    # this Linux-specific behavior can still be tested on Windows.
+    monkeypatch.setattr(
+        alarm_tool.signal,
+        "SIGKILL",
+        9,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        alarm_tool.os,
+        "getpgid",
+        lambda process_id: 54321,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        alarm_tool.os,
+        "killpg",
+        lambda process_group, process_signal: (
+            sent_signals.append(
+                (
+                    process_group,
+                    process_signal,
+                )
+            )
+        ),
+        raising=False,
+    )
+
+    alarm_tool._stop_linux_sound_process(
+        process
+    )
+
+    assert sent_signals == [
+        (
+            54321,
+            alarm_tool.signal.SIGTERM,
+        ),
+        (
+            54321,
+            alarm_tool.signal.SIGKILL,
+        ),
+    ]
+    assert process.terminate_calls == 0
+    assert process.kill_calls == 0

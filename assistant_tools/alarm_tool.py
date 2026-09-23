@@ -18,6 +18,7 @@ future Raspberry Pi runtime can poll periodically.
 import json
 import os
 import re
+import signal
 import sys
 import time
 import uuid
@@ -652,18 +653,55 @@ def _wait_for_alarm_interval(
     )
 
 
+def _signal_linux_sound_process(
+    process,
+    process_signal,
+):
+    """
+    Signal the entire alarm process group.
+
+    speaker-test may create a child audio process. Stopping only
+    speaker-test can leave that child playing after SATURN says the
+    alarm was dismissed.
+    """
+
+    try:
+        process_group = os.getpgid(
+            process.pid
+        )
+
+        os.killpg(
+            process_group,
+            process_signal,
+        )
+    except (
+        AttributeError,
+        OSError,
+    ):
+        if process_signal == signal.SIGTERM:
+            process.terminate()
+        else:
+            process.kill()
+
+
 def _stop_linux_sound_process(process):
     if process.poll() is not None:
         return
 
-    process.terminate()
+    _signal_linux_sound_process(
+        process,
+        signal.SIGTERM,
+    )
 
     try:
         process.wait(
             timeout=1
         )
     except subprocess.TimeoutExpired:
-        process.kill()
+        _signal_linux_sound_process(
+            process,
+            signal.SIGKILL,
+        )
         process.wait(
             timeout=1
         )
@@ -744,6 +782,7 @@ def play_alarm_sound(repetitions=5):
                         ],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
+                        start_new_session=True,
                     )
 
                     deadline = (
