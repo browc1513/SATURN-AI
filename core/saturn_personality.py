@@ -941,6 +941,69 @@ class SATURN:
             return "lists"
 
         # --------------------------------------------------------
+        # Explicit mathematical-operation routing
+        # --------------------------------------------------------
+        #
+        # These patterns preserve executable uses of words that also
+        # occur in ordinary conversation. They intentionally require
+        # an operation shape, numeric data, an expression, or a known
+        # mathematical object.
+        # --------------------------------------------------------
+
+        explicit_math_operation_patterns = [
+            r"\b(?:sum|difference|product)\s+"
+            r"(?:of|between)\s+"
+            r"(?:[-+]?\d+(?:\.\d+)?|\b[a-z]\b)\s*"
+            r"(?:and|,)\s*"
+            r"(?:[-+]?\d+(?:\.\d+)?|\b[a-z]\b)",
+            r"\b[-+]?\d+(?:\.\d+)?\s+"
+            r"times\s+"
+            r"[-+]?\d+(?:\.\d+)?\b",
+            r"\bfactor\s+"
+            r"(?:the\s+)?"
+            r"(?:expression|polynomial)\s+.+",
+            r"\bfactor\s+[-+]?\d+\b",
+            r"\bfactor\s+[a-z]\s*"
+            r"(?:\^|\*\*|squared\b|[+\-*/])",
+            r"\b[-+]?\d+(?:\.\d+)?\s+"
+            r"(?:to\s+(?:the\s+)?)?"
+            r"power\s+(?:of\s+)?"
+            r"[-+]?\d+(?:\.\d+)?\b",
+            r"\b(?:find|evaluate|calculate|compute)\s+"
+            r"(?:the\s+)?limit\b",
+            r"\blimit\s+of\s+.+"
+            r"\b(?:as|when)\b",
+            r"\b(?:find|calculate|compute)\s+"
+            r"(?:the\s+)?"
+            r"(?:maximum|minimum)\s+"
+            r"(?:of|for)\b",
+            r"\b(?:find|calculate|compute|what(?:['?]s| is))\s+"
+            r"(?:the\s+)?"
+            r"(?:area|volume)\s+of\s+"
+            r"(?:a\s+|an\s+|the\s+)?"
+            r"(?:circle|square|rectangle|triangle|"
+            r"parallelogram|trapezoid|rhombus|polygon|"
+            r"cube|sphere|cylinder|cone|prism|pyramid)\b",
+            r"\b(?:tangent|sine|cosine|sin|cos|tan)\s+"
+            r"(?:of\s+)?"
+            r"[-+]?(?:\d|pi\b)",
+            r"\btangent\s+line\b",
+            r"\bvector\s+"
+            r"(?:magnitude|direction|components?)\b",
+            r"\b(?:magnitude|direction|components?)\s+"
+            r"(?:of\s+)?(?:the\s+)?vector\b",
+        ]
+
+        if any(
+            re.search(
+                pattern,
+                normalized,
+            )
+            for pattern in explicit_math_operation_patterns
+        ):
+            return "math"
+
+        # --------------------------------------------------------
         # Conversational explanation routing
         # --------------------------------------------------------
         #
@@ -1010,14 +1073,10 @@ class SATURN:
 
             # Arithmetic
             "add",
-            "sum",
             "plus",
             "subtract",
-            "difference",
             "minus",
             "multiply",
-            "product",
-            "times",
             "divide",
             "divided by",
             "quotient",
@@ -1026,14 +1085,11 @@ class SATURN:
 
             # Algebra
             "algebra",
-            "factor",
             "simplify",
             "expand",
             "polynomial",
             "squared",
             "cubed",
-            "power",
-            "powers",
 
             # Calculus
             "calculus",
@@ -1041,17 +1097,11 @@ class SATURN:
             "differentiate",
             "integral",
             "integrate",
-            "limit",
             "riemann",
             "extrema",
-            "maximum",
-            "minimum",
 
             # Geometry
             "geometry",
-            "area",
-            "volume",
-            "radius",
             "diameter",
             "circumference",
             "perimeter",
@@ -1064,7 +1114,6 @@ class SATURN:
             "cos",
             "cosine",
             "tan",
-            "tangent",
             "arcsin",
             "arcsine",
             "arccos",
@@ -1075,7 +1124,6 @@ class SATURN:
             # Linear algebra
             "matrix",
             "determinant",
-            "vector",
             "rref",
             "eigenvalue",
             "eigenvector",
