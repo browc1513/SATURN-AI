@@ -941,6 +941,61 @@ class SATURN:
             return "lists"
 
         # --------------------------------------------------------
+        # Conversational explanation routing
+        # --------------------------------------------------------
+        #
+        # Broad mathematical words such as "mean", "difference",
+        # "product", and "power" also occur in ordinary questions.
+        # Definition and comparison questions are better handled by
+        # the conversational model unless they contain an explicit
+        # mathematical operation or expression.
+        # --------------------------------------------------------
+
+        conversational_question_patterns = [
+            r"\bwhat\s+does\b.+\bmean\b",
+            r"\bwhat(?:['?]s| is)\s+the\s+meaning\s+of\b",
+            r"\bwhat(?:['?]s| is)\s+the\s+difference\s+between\b",
+            r"\bexplain\s+the\s+difference\s+between\b",
+            r"\btell\s+me\s+about\b",
+            r"\bexplain\b",
+        ]
+
+        if any(
+            re.search(
+                pattern,
+                normalized,
+            )
+            for pattern in conversational_question_patterns
+        ):
+            return "unknown"
+
+        # --------------------------------------------------------
+        # Explicit statistics routing
+        # --------------------------------------------------------
+
+        statistics_patterns = [
+            r"\b(?:calculate|compute|find)\s+"
+            r"(?:the\s+)?"
+            r"(?:mean|average|standard deviation)\b",
+            r"\bwhat(?:['?]s| is)\s+"
+            r"(?:the\s+)?"
+            r"(?:mean|average|standard deviation)\s+"
+            r"(?:of|for)\b",
+            r"\b(?:mean|average|standard deviation)\s+"
+            r"(?:of|for)\s+"
+            r"[-+]?\d",
+        ]
+
+        if any(
+            re.search(
+                pattern,
+                normalized,
+            )
+            for pattern in statistics_patterns
+        ):
+            return "math"
+
+        # --------------------------------------------------------
         # Math routing
         # --------------------------------------------------------
 
@@ -1025,10 +1080,6 @@ class SATURN:
             "eigenvalue",
             "eigenvector",
 
-            # Statistics
-            "mean",
-            "average",
-            "standard deviation",
         ]
 
         if self._contains_any_keyword(
