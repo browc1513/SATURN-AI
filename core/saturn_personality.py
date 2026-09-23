@@ -458,12 +458,28 @@ class SATURN:
                     "expires_in_seconds": request[
                         "expires_in_seconds"
                     ],
+                    "follow_up_required": True,
                 },
             }
+
+        contextual_reboot_confirmation = (
+            self.reboot_controller.has_pending_confirmation(
+                session_id
+            )
+            and normalized_control
+            in {
+                "confirm",
+                "yes",
+                "yes please",
+                "proceed",
+                "do it",
+            }
+        )
 
         if (
             normalized_control
             in reboot_confirmation_commands
+            or contextual_reboot_confirmation
         ):
             confirmation = (
                 self.reboot_controller.confirm(
@@ -508,9 +524,22 @@ class SATURN:
                 },
             }
 
+        contextual_reboot_cancellation = (
+            self.reboot_controller.has_pending_confirmation(
+                session_id
+            )
+            and normalized_control
+            in {
+                "cancel",
+                "no",
+                "no thanks",
+            }
+        )
+
         if (
             normalized_control
             in reboot_cancellation_commands
+            or contextual_reboot_cancellation
         ):
             cancelled = self.reboot_controller.cancel(
                 session_id

@@ -1,4 +1,4 @@
-﻿from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -347,3 +347,119 @@ def test_reboot_phrases_never_reach_local_model(
         )
 
     mocked_unknown.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "confirmation",
+    [
+        "Confirm",
+        "Yes",
+        "Yes please",
+        "Proceed",
+        "Do it",
+    ],
+)
+def test_pending_reboot_accepts_contextual_confirmation(
+    enabled_controller,
+    confirmation,
+):
+    saturn = SATURN(
+        start_alarm_monitor=False
+    )
+    saturn.reboot_controller = enabled_controller
+
+    requested = saturn.handle_query(
+        "Reboot Saturn",
+        session_id="voice",
+    )
+
+    assert requested["data"]["follow_up_required"] is True
+
+    with patch.object(
+        enabled_controller,
+        "schedule_reboot",
+    ) as mocked_schedule:
+        result = saturn.handle_query(
+            confirmation,
+            session_id="voice",
+        )
+
+    assert result["success"] is True
+    assert result["data"]["action"] == (
+        "reboot_confirmed"
+    )
+    mocked_schedule.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    "cancellation",
+    [
+        "Cancel",
+        "No",
+        "No thanks",
+    ],
+)
+def test_pending_reboot_accepts_contextual_cancellation(
+    enabled_controller,
+    cancellation,
+):
+    saturn = SATURN(
+        start_alarm_monitor=False
+    )
+    saturn.reboot_controller = enabled_controller
+
+    saturn.handle_query(
+        "Reboot Saturn",
+        session_id="voice",
+    )
+
+    result = saturn.handle_query(
+        cancellation,
+        session_id="voice",
+    )
+
+    assert result["success"] is True
+    assert result["data"]["action"] == (
+        "reboot_cancelled"
+    )
+    assert not enabled_controller.has_pending_confirmation(
+        "voice"
+    )
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Confirm",
+        "Yes",
+        "Proceed",
+        "Cancel",
+        "No",
+    ],
+)
+def test_contextual_replies_require_pending_reboot(
+    enabled_controller,
+    query,
+):
+    saturn = SATURN(
+        start_alarm_monitor=False
+    )
+    saturn.reboot_controller = enabled_controller
+
+    with patch.object(
+        enabled_controller,
+        "schedule_reboot",
+    ) as mocked_schedule:
+        result = saturn.handle_query(
+            query,
+            session_id="voice",
+        )
+
+    assert (
+        result.get("data")
+        or {}
+    ).get("action") not in {
+        "reboot_confirmed",
+        "reboot_cancelled",
+    }
+    mocked_schedule.assert_not_called()
