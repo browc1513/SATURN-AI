@@ -1,4 +1,4 @@
-﻿"""
+"""
 Discovery and validation for SATURN custom alarm tones.
 
 Only WAV files located directly inside SATURN's configured alarm-tone
@@ -28,6 +28,11 @@ ALARM_TONES_DIRECTORY_ENV = (
 SUPPORTED_ALARM_TONE_SUFFIXES = {
     ".wav",
 }
+
+DEFAULT_ALARM_TONE_NAME = os.environ.get(
+    "SATURN_DEFAULT_ALARM_TONE",
+    "Saturn Alarm 1",
+).strip()
 
 
 def get_alarm_tones_directory():
@@ -203,3 +208,18 @@ def resolve_alarm_tone(value):
             return tone
 
     return None
+
+def resolve_default_alarm_tone():
+    """
+    Return SATURN's installed default tone, when available.
+
+    A missing default never exposes or constructs an arbitrary path.
+    Playback safely falls back to the platform alarm sound.
+    """
+
+    if not DEFAULT_ALARM_TONE_NAME:
+        return None
+
+    return resolve_alarm_tone(
+        DEFAULT_ALARM_TONE_NAME
+    )

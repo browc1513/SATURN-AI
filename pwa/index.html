@@ -27,7 +27,7 @@
 
     <link
         rel="stylesheet"
-        href="/app/style.css?v=5"
+        href="/app/style.css?v=6"
     >
 </head>
 
@@ -269,37 +269,17 @@
                 </select>
 
                 <select
-                    id="alarm-playback-mode"
+                    id="alarm-type-select"
                     class="item-input"
-                    aria-label="Alarm playback mode"
+                    aria-label="Alarm type"
                 >
-                    <option value="until_dismissed">
-                        Ring until stopped or snoozed
+                    <option value="wake_up">
+                        Wake-up alarm ? ring until stopped
                     </option>
-                    <option value="timed">
-                        Ring for a set amount of time
+                    <option value="reminder">
+                        Reminder ? ring for 10 seconds
                     </option>
                 </select>
-
-                <div
-                    id="alarm-duration-container"
-                    class="hidden"
-                >
-                    <label for="alarm-duration-seconds">
-                        Ring duration in seconds
-                    </label>
-
-                    <input
-                        id="alarm-duration-seconds"
-                        class="item-input"
-                        type="number"
-                        value="30"
-                        min="5"
-                        max="1800"
-                        step="1"
-                        inputmode="numeric"
-                    >
-                </div>
 
                 <button
                     id="create-alarm-button"
@@ -340,6 +320,6 @@
 
     </main>
 
-    <script src="/app/app.js?v=5"></script>
+    <script src="/app/app.js?v=6"></script>
 </body>
 </html>

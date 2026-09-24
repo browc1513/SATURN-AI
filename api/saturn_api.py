@@ -1,12 +1,11 @@
 from pathlib import Path
-from typing import Literal
-
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from assistant_tools.alarm_tones import (
+    DEFAULT_ALARM_TONE_NAME,
     list_alarm_tones,
 )
 from assistant_tools.list_tool import get_all_lists
@@ -68,14 +67,9 @@ class AlarmCreateRequest(BaseModel):
         default=None,
         max_length=255,
     )
-    playback_mode: Literal[
-        "timed",
-        "until_dismissed",
-    ] = "until_dismissed"
-    playback_duration_seconds: int | None = Field(
-        default=None,
-        ge=5,
-        le=1800,
+    alarm_type: str = Field(
+        default="wake_up",
+        pattern=r"^(?:reminder|wake_up)$",
     )
 
 
@@ -300,6 +294,7 @@ def get_alarm_tones():
 
     return {
         "success": True,
+        "default_tone": DEFAULT_ALARM_TONE_NAME,
         "tones": [
             {
                 "name": tone["name"],
@@ -327,25 +322,25 @@ def get_alarms():
 
 @app.post("/api/alarms")
 def create_alarm(request: AlarmCreateRequest):
-    query_parts = [
-        f"set an alarm for {request.time.strip()}"
-    ]
+    clean_time = request.time.strip()
+
+    if request.alarm_type == "reminder":
+        query_parts = [
+            f"remind me at {clean_time}"
+        ]
+    else:
+        query_parts = [
+            f"set an alarm for {clean_time}"
+        ]
 
     if request.tone:
         query_parts.append(
             f"with the {request.tone.strip()} tone"
         )
 
-    if request.playback_mode == "timed":
-        duration = (
-            request.playback_duration_seconds
-            if request.playback_duration_seconds
-            is not None
-            else 30
-        )
-
+    if request.alarm_type == "reminder":
         query_parts.append(
-            f"for {duration} seconds"
+            "for 10 seconds"
         )
     else:
         query_parts.append(

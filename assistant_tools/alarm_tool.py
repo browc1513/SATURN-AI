@@ -45,6 +45,7 @@ from assistant_tools.alarm_playback_policy import (
 )
 from assistant_tools.alarm_tones import (
     resolve_alarm_tone,
+    resolve_default_alarm_tone,
 )
 from assistant_tools.storage_tool import atomic_save_json, storage_transaction
 
@@ -302,7 +303,7 @@ def _detect_action(text):
         return "show"
 
     if re.search(
-        r"\b(?:set|create|make|wake me)\b",
+        r"\b(?:set|create|make|wake me|remind me)\b",
         normalized,
     ):
         return "set"
@@ -313,12 +314,129 @@ def _detect_action(text):
     return "unknown"
 
 
+def _parse_spoken_number(text):
+    """
+    Parse the small spoken-number range needed for snoozing.
+    """
+
+    normalized = re.sub(
+        r"[-]+",
+        " ",
+        str(text or "").strip().lower(),
+    )
+
+    if normalized.isdigit():
+        return int(normalized)
+
+    units = {
+        "zero": 0,
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+        "eleven": 11,
+        "twelve": 12,
+        "thirteen": 13,
+        "fourteen": 14,
+        "fifteen": 15,
+        "sixteen": 16,
+        "seventeen": 17,
+        "eighteen": 18,
+        "nineteen": 19,
+    }
+
+    tens = {
+        "twenty": 20,
+        "thirty": 30,
+        "forty": 40,
+        "fifty": 50,
+        "sixty": 60,
+        "seventy": 70,
+        "eighty": 80,
+        "ninety": 90,
+    }
+
+    tokens = [
+        token
+        for token in normalized.split()
+        if token != "and"
+    ]
+
+    if not tokens:
+        return None
+
+    if len(tokens) == 1:
+        return (
+            units.get(tokens[0])
+            if tokens[0] in units
+            else tens.get(tokens[0])
+        )
+
+    if (
+        len(tokens) == 2
+        and tokens[0] in tens
+        and tokens[1] in units
+        and units[tokens[1]] < 10
+    ):
+        return (
+            tens[tokens[0]]
+            + units[tokens[1]]
+        )
+
+    if tokens in (
+        ["one", "hundred"],
+        ["a", "hundred"],
+    ):
+        return 100
+
+    if (
+        len(tokens) == 3
+        and tokens[0] in {"one", "a"}
+        and tokens[1] == "hundred"
+    ):
+        remainder = (
+            units.get(tokens[2])
+            if tokens[2] in units
+            else tens.get(tokens[2])
+        )
+
+        if remainder is not None:
+            return 100 + remainder
+
+    if (
+        len(tokens) == 4
+        and tokens[0] in {"one", "a"}
+        and tokens[1] == "hundred"
+        and tokens[2] in tens
+        and tokens[3] in units
+        and units[tokens[3]] < 10
+    ):
+        return (
+            100
+            + tens[tokens[2]]
+            + units[tokens[3]]
+        )
+
+    return None
+
+
 def _parse_snooze_minutes(text):
-    normalized = str(text).lower()
+    normalized = re.sub(
+        r"\s+",
+        " ",
+        str(text or "").strip().lower(),
+    )
 
     match = re.search(
         r"\bsnooze(?:\s+(?:the\s+)?alarm)?"
-        r"(?:\s+for)?\s+(\d+)\s*"
+        r"(?:\s+for)?\s+"
+        r"(.+?)\s*"
         r"(minutes?|mins?|hours?|hrs?)\b",
         normalized,
     )
@@ -326,9 +444,13 @@ def _parse_snooze_minutes(text):
     if not match:
         return DEFAULT_SNOOZE_MINUTES
 
-    amount = int(
+    amount = _parse_spoken_number(
         match.group(1)
     )
+
+    if amount is None:
+        return None
+
     unit = match.group(2)
 
     if unit.startswith(
@@ -565,13 +687,17 @@ def handle_alarm_query(text):
             text
         )
 
-        if minutes < 1 or minutes > 1440:
+        if (
+            minutes is None
+            or minutes < 1
+            or minutes > 120
+        ):
             return {
                 "success": False,
                 "action": action,
                 "response": (
                     "Please choose a snooze time between "
-                    "1 minute and 24 hours."
+                    "1 and 120 minutes."
                 ),
                 "error": "Invalid snooze duration.",
             }
@@ -709,6 +835,12 @@ def handle_alarm_query(text):
                 "error": "Alarm tone not found.",
             }
 
+        selected_tone = (
+            tone_request["tone"]
+            if tone_request["requested"]
+            else resolve_default_alarm_tone()
+        )
+
         trigger_text = (
             remove_alarm_playback_policy_language(
                 text
@@ -740,8 +872,8 @@ def handle_alarm_query(text):
             "status": "active",
             "label": "Alarm",
             "tone": (
-                tone_request["tone"]["filename"]
-                if tone_request["tone"]
+                selected_tone["filename"]
+                if selected_tone
                 else None
             ),
             "playback_mode": playback_policy[
@@ -1102,6 +1234,10 @@ def play_alarm_sound(
     playback_generation = (
         begin_alarm_playback(
             alarm_id=alarm_id,
+            requires_dismissal=(
+                resolved_mode
+                == UNTIL_DISMISSED_MODE
+            ),
         )
     )
 
@@ -1297,7 +1433,11 @@ def play_alarm_sound(
 
     finally:
         finish_alarm_playback(
-            alarm_id=alarm_id
+            alarm_id=alarm_id,
+            requires_dismissal=(
+                resolved_mode
+                == UNTIL_DISMISSED_MODE
+            ),
         )
 
 

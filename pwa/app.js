@@ -19,12 +19,8 @@ const createAlarmForm = document.getElementById("create-alarm-form");
 const newAlarmTime = document.getElementById("new-alarm-time");
 const createAlarmButton = document.getElementById("create-alarm-button");
 const alarmToneSelect = document.getElementById("alarm-tone-select");
-const alarmPlaybackMode = document.getElementById("alarm-playback-mode");
-const alarmDurationContainer = document.getElementById(
-    "alarm-duration-container"
-);
-const alarmDurationSeconds = document.getElementById(
-    "alarm-duration-seconds"
+const alarmTypeSelect = document.getElementById(
+    "alarm-type-select"
 );
 const snoozeAlarmButton = document.getElementById(
     "snooze-alarm-button"
@@ -100,6 +96,10 @@ async function loadAlarmTones() {
     const tones = Array.isArray(result.tones)
         ? result.tones
         : [];
+    const defaultTone = (
+        result.default_tone
+        || "Saturn Alarm 1"
+    );
 
     const previousValue = alarmToneSelect.value;
 
@@ -109,10 +109,15 @@ async function loadAlarmTones() {
         "option"
     );
     defaultOption.value = "";
-    defaultOption.textContent = "Default alarm tone";
+    defaultOption.textContent = (
+        `${defaultTone} (Default)`
+    );
     alarmToneSelect.appendChild(defaultOption);
 
     for (const tone of tones) {
+        if (tone.name === defaultTone) {
+            continue;
+        }
         const option = document.createElement(
             "option"
         );
@@ -134,20 +139,6 @@ async function loadAlarmTones() {
 }
 
 
-function updateAlarmDurationVisibility() {
-    const timed = (
-        alarmPlaybackMode.value === "timed"
-    );
-
-    alarmDurationContainer.classList.toggle(
-        "hidden",
-        !timed
-    );
-
-    alarmDurationSeconds.disabled = !timed;
-}
-
-
 async function showAlarms() {
     hideAllViews();
     alarmsView.classList.remove("hidden");
@@ -156,8 +147,6 @@ async function showAlarms() {
         loadAlarms(),
         loadAlarmTones(),
     ]);
-
-    updateAlarmDurationVisibility();
 }
 
 
@@ -551,8 +540,7 @@ async function loadAlarms() {
 async function createAlarm(
     time,
     tone,
-    playbackMode,
-    durationSeconds
+    alarmType,
 ) {
     const cleanTime = time.trim();
 
@@ -563,12 +551,7 @@ async function createAlarm(
     const requestBody = {
         time: cleanTime,
         tone: tone || null,
-        playback_mode: playbackMode,
-        playback_duration_seconds: (
-            playbackMode === "timed"
-                ? durationSeconds
-                : null
-        ),
+        alarm_type: alarmType,
     };
 
     const response = await fetch(
@@ -875,14 +858,6 @@ stopAlarmButton.addEventListener(
 );
 
 
-alarmPlaybackMode.addEventListener(
-    "change",
-    updateAlarmDurationVisibility
-);
-
-updateAlarmDurationVisibility();
-
-
 createAlarmForm.addEventListener(
     "submit",
     async (event) => {
@@ -890,43 +865,22 @@ createAlarmForm.addEventListener(
 
         const time = newAlarmTime.value.trim();
         const tone = alarmToneSelect.value;
-        const playbackMode = alarmPlaybackMode.value;
-        const durationSeconds = Number.parseInt(
-            alarmDurationSeconds.value,
-            10
-        );
+        const alarmType = alarmTypeSelect.value;
 
         if (!time) {
-            return;
-        }
-
-        if (
-            playbackMode === "timed"
-            && (
-                !Number.isInteger(durationSeconds)
-                || durationSeconds < 5
-                || durationSeconds > 1800
-            )
-        ) {
-            window.alert(
-                "Alarm duration must be between "
-                + "5 and 1800 seconds."
-            );
             return;
         }
 
         createAlarmButton.disabled = true;
         newAlarmTime.disabled = true;
         alarmToneSelect.disabled = true;
-        alarmPlaybackMode.disabled = true;
-        alarmDurationSeconds.disabled = true;
+        alarmTypeSelect.disabled = true;
 
         try {
             await createAlarm(
                 time,
                 tone,
-                playbackMode,
-                durationSeconds
+                alarmType,
             );
             newAlarmTime.value = "";
         } catch (error) {
@@ -935,8 +889,7 @@ createAlarmForm.addEventListener(
             createAlarmButton.disabled = false;
             newAlarmTime.disabled = false;
             alarmToneSelect.disabled = false;
-            alarmPlaybackMode.disabled = false;
-            updateAlarmDurationVisibility();
+            alarmTypeSelect.disabled = false;
             newAlarmTime.focus();
         }
     }

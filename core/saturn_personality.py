@@ -806,6 +806,25 @@ class SATURN:
         ):
             return "lists"
 
+        # Explicit reminder requests must take priority over
+        # keywords belonging to other domains. For example,
+        # "Remind me to call the vet" is an alarm request,
+        # not a veterinary question.
+        explicit_reminder_patterns = [
+            r"\bremind\s+me\b",
+            r"\bset\s+(?:a\s+)?reminder\b",
+            r"\bcreate\s+(?:a\s+)?reminder\b",
+        ]
+
+        if any(
+            re.search(
+                pattern,
+                normalized,
+            )
+            for pattern in explicit_reminder_patterns
+        ):
+            return "alarms"
+
         veterinary_keywords = [
             "vet",
             "veterinary",
@@ -915,6 +934,8 @@ class SATURN:
             "alarms",
             "wake me",
             "wake me up",
+            "remind me",
+            "reminder",
         ]
 
         alarm_patterns = [
@@ -929,8 +950,10 @@ class SATURN:
             r"\bsnooze"
             r"(?:\s+(?:the\s+|my\s+)?)?"
             r"(?:ringing\s+)?alarm\b",
-            r"\bsnooze(?:\s+for)?\s+\d+\s*"
+            r"\bsnooze(?:\s+for)?\s+"
+            r"(?:\d+|[a-z -]+)\s*"
             r"(?:minutes?|mins?|hours?|hrs?)\b",
+            r"\bremind\s+me\b",
         ]
 
         if (

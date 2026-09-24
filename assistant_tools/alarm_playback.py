@@ -46,6 +46,7 @@ def _default_state():
         "generation": 0,
         "active_count": 0,
         "active_alarm_ids": [],
+        "dismissal_required_count": 0,
         "updated_at": _utc_now().isoformat(),
     }
 
@@ -119,6 +120,22 @@ def _load_state():
     if not isinstance(active_alarm_ids, list):
         active_alarm_ids = []
 
+    try:
+        dismissal_required_count = max(
+            0,
+            int(
+                state.get(
+                    "dismissal_required_count",
+                    0,
+                )
+            ),
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
+        dismissal_required_count = 0
+
     active_alarm_ids = [
         str(alarm_id)
         for alarm_id in active_alarm_ids
@@ -131,11 +148,20 @@ def _load_state():
     ):
         active_count = 0
         active_alarm_ids = []
+        dismissal_required_count = 0
+
+    dismissal_required_count = min(
+        dismissal_required_count,
+        active_count,
+    )
 
     return {
         "generation": generation,
         "active_count": active_count,
         "active_alarm_ids": active_alarm_ids,
+        "dismissal_required_count": (
+            dismissal_required_count
+        ),
         "updated_at": str(updated_at or ""),
     }
 
@@ -153,6 +179,7 @@ def _save_state(state):
 
 def begin_alarm_playback(
     alarm_id=None,
+    requires_dismissal=False,
 ):
     os.makedirs(
         DATA_DIR,
@@ -164,6 +191,11 @@ def begin_alarm_playback(
     ):
         state = _load_state()
         state["active_count"] += 1
+
+        if requires_dismissal:
+            state[
+                "dismissal_required_count"
+            ] += 1
 
         if alarm_id:
             alarm_id = str(alarm_id)
@@ -180,6 +212,7 @@ def begin_alarm_playback(
 
 def finish_alarm_playback(
     alarm_id=None,
+    requires_dismissal=False,
 ):
     with storage_transaction(
         ALARM_PLAYBACK_STATE_FILE
@@ -189,6 +222,16 @@ def finish_alarm_playback(
             0,
             state["active_count"] - 1,
         )
+
+        if requires_dismissal:
+            state[
+                "dismissal_required_count"
+            ] = max(
+                0,
+                state[
+                    "dismissal_required_count"
+                ] - 1,
+            )
 
         if alarm_id:
             alarm_id = str(alarm_id)
@@ -202,6 +245,9 @@ def finish_alarm_playback(
 
         if state["active_count"] == 0:
             state["active_alarm_ids"] = []
+            state[
+                "dismissal_required_count"
+            ] = 0
 
         _save_state(state)
 
@@ -306,3 +352,22 @@ def is_alarm_ringing():
         state = _load_state()
 
         return state["active_count"] > 0
+
+def is_dismissal_required_alarm_ringing():
+    """
+    Return whether a continuous alarm is currently ringing.
+
+    Timed reminders do not activate wake-word-free listening.
+    """
+
+    with storage_transaction(
+        ALARM_PLAYBACK_STATE_FILE
+    ):
+        state = _load_state()
+
+        return (
+            state["active_count"] > 0
+            and state[
+                "dismissal_required_count"
+            ] > 0
+        )

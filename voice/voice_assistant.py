@@ -1,4 +1,12 @@
+from assistant_tools.alarm_playback import (
+    is_dismissal_required_alarm_ringing,
+)
 from core.saturn_instance import get_saturn
+from voice.alarm_control import (
+    ALARM_CONTROL_PHRASE_LIMIT_SECONDS,
+    ALARM_CONTROL_TIMEOUT_SECONDS,
+    is_wake_free_alarm_command,
+)
 from voice.conversation_control import (
     is_silent_follow_up_timeout,
     load_voice_timing,
@@ -51,9 +59,66 @@ def main():
             # --------------------------------------------------
             # 1. Wait for "Hey Saturn"
             # --------------------------------------------------
-            wait_for_wake_word(
-                wake_model
+            wake_event = wait_for_wake_word(
+                wake_model,
+                interrupt_check=(
+                    is_dismissal_required_alarm_ringing
+                ),
             )
+
+            if wake_event is None:
+                print(
+                    "Continuous alarm active; "
+                    "listening for stop or snooze..."
+                )
+
+                speech_result = listen_once(
+                    timeout=(
+                        ALARM_CONTROL_TIMEOUT_SECONDS
+                    ),
+                    phrase_time_limit=(
+                        ALARM_CONTROL_PHRASE_LIMIT_SECONDS
+                    ),
+                )
+
+                if not speech_result["success"]:
+                    continue
+
+                command = speech_result["text"]
+
+                if not is_wake_free_alarm_command(
+                    command
+                ):
+                    print(
+                        "Ignored non-alarm speech "
+                        "while alarm was ringing."
+                    )
+                    continue
+
+                print(
+                    f"You: {command}"
+                )
+
+                result = saturn.handle_query(
+                    command,
+                    session_id=VOICE_SESSION_ID,
+                )
+
+                response = result.get(
+                    "response",
+                    "I couldn't control the alarm.",
+                )
+
+                print(
+                    f"S.A.T.U.R.N.: {response}"
+                )
+
+                speak_and_wait(
+                    response
+                )
+
+                print()
+                continue
 
             # --------------------------------------------------
             # 2. Acknowledge wake event

@@ -15,7 +15,7 @@ DEFAULT_ALARM_PLAYBACK_MODE = (
     UNTIL_DISMISSED_MODE
 )
 
-DEFAULT_TIMED_ALARM_SECONDS = 30
+DEFAULT_TIMED_ALARM_SECONDS = 10
 MINIMUM_TIMED_ALARM_SECONDS = 5
 MAXIMUM_TIMED_ALARM_SECONDS = 1800
 
@@ -59,6 +59,29 @@ def parse_alarm_playback_policy(text):
         " ",
         str(text or "").strip().lower(),
     )
+
+    reminder_patterns = [
+        r"\bremind\s+me\b",
+        r"\breminder\b",
+        r"\bshort\s+alarm\b",
+    ]
+
+    if any(
+        re.search(
+            pattern,
+            normalized,
+        )
+        for pattern in reminder_patterns
+    ):
+        return {
+            "success": True,
+            "mode": TIMED_MODE,
+            "duration_seconds": (
+                DEFAULT_TIMED_ALARM_SECONDS
+            ),
+            "explicit": True,
+            "error": None,
+        }
 
     persistent_patterns = [
         r"\buntil\s+(?:i\s+)?(?:stop|dismiss|snooze)"

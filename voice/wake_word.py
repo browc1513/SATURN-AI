@@ -29,7 +29,10 @@ def create_wake_model():
     )
 
 
-def wait_for_wake_word(model):
+def wait_for_wake_word(
+    model,
+    interrupt_check=None,
+):
     """
     Listen until Hey Saturn is detected.
 
@@ -57,6 +60,14 @@ def wait_for_wake_word(model):
 
     try:
         while True:
+            if (
+                interrupt_check is not None
+                and interrupt_check()
+            ):
+                model.reset()
+
+                return None
+
             audio_bytes = stream.read(
                 CHUNK,
                 exception_on_overflow=False,
