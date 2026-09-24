@@ -182,3 +182,4 @@ data/*.json.*.tmp
 
 # Locally installed Piper voice models
 /voice/models/piper/
+data/alarm_tones/
