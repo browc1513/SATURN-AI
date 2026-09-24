@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from unittest.mock import patch
 
 from api.saturn_api import (
@@ -82,7 +82,7 @@ def test_pwa_connects_alarm_controls_to_api():
     assert '"stop"' in app
 
 
-def test_pwa_alarm_controls_use_v4_assets():
+def test_pwa_alarm_controls_use_v5_assets():
     index = Path(
         "pwa/index.html"
     ).read_text(encoding="utf-8")
@@ -91,8 +91,8 @@ def test_pwa_alarm_controls_use_v4_assets():
         "pwa/service-worker.js"
     ).read_text(encoding="utf-8")
 
-    assert 'app.js?v=4' in index
-    assert 'style.css?v=4' in index
-    assert 'saturn-pwa-v4' in worker
-    assert 'app.js?v=4' in worker
-    assert 'style.css?v=4' in worker
+    assert 'app.js?v=5' in index
+    assert 'style.css?v=5' in index
+    assert 'saturn-pwa-v5' in worker
+    assert 'app.js?v=5' in worker
+    assert 'style.css?v=5' in worker

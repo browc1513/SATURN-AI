@@ -346,6 +346,15 @@ class SATURN:
                             "alarm_id": alarm.get(
                                 "id"
                             ),
+                            "tone": alarm.get(
+                                "tone"
+                            ),
+                            "playback_mode": alarm.get(
+                                "playback_mode"
+                            ),
+                            "playback_duration_seconds": alarm.get(
+                                "playback_duration_seconds"
+                            ),
                         },
                         daemon=True,
                         name="SATURNAlarmSound",

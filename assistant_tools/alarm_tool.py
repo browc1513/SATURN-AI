@@ -31,8 +31,20 @@ from assistant_tools.alarm_playback import (
     begin_alarm_playback,
     finish_alarm_playback,
     get_ringing_alarm_ids,
+    refresh_alarm_playback,
     should_stop_alarm_playback,
     stop_alarm_playback,
+)
+from assistant_tools.alarm_playback_policy import (
+    TIMED_MODE,
+    UNTIL_DISMISSED_MODE,
+    normalize_saved_playback_policy,
+    parse_alarm_playback_policy,
+    remove_alarm_playback_policy_language,
+    timed_alarm_has_expired,
+)
+from assistant_tools.alarm_tones import (
+    resolve_alarm_tone,
 )
 from assistant_tools.storage_tool import atomic_save_json, storage_transaction
 
@@ -330,6 +342,79 @@ def _parse_snooze_minutes(text):
     return amount
 
 
+def _parse_requested_tone(text):
+    """
+    Extract a friendly custom-tone name from an alarm request.
+
+    Examples:
+        with the Zen Gong tone
+        using Morning Bell tone
+        with the Ocean alarm tone
+    """
+
+    match = re.search(
+        r"\b(?:with|using)\s+"
+        r"(?:the\s+)?"
+        r"(.+?)\s+"
+        r"(?:alarm\s+)?tone\b",
+        str(text),
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return {
+            "requested": False,
+            "name": None,
+            "tone": None,
+        }
+
+    requested_name = re.sub(
+        r"\s+",
+        " ",
+        match.group(1),
+    ).strip(
+        " .,!?:;"
+    )
+
+    return {
+        "requested": True,
+        "name": requested_name,
+        "tone": resolve_alarm_tone(
+            requested_name
+        ),
+    }
+
+
+def _resolve_playback_tone_path(tone_name):
+    tone = resolve_alarm_tone(
+        tone_name
+    )
+
+    if tone is None:
+        return None
+
+    return tone["path"]
+
+
+def _linux_alarm_command(tone_path=None):
+    if tone_path:
+        return [
+            "aplay",
+            "--quiet",
+            tone_path,
+        ]
+
+    return [
+        "speaker-test",
+        "-t",
+        "sine",
+        "-f",
+        "880",
+        "-l",
+        "1",
+    ]
+
+
 def _active_alarms(alarms):
     return [
         alarm
@@ -519,6 +604,16 @@ def handle_alarm_query(text):
             ),
             "snoozed_from_alarm_id": source_alarm_id,
             "snooze_minutes": minutes,
+            "tone": source_alarm.get(
+                "tone"
+            ),
+            "playback_mode": source_alarm.get(
+                "playback_mode",
+                "until_dismissed",
+            ),
+            "playback_duration_seconds": source_alarm.get(
+                "playback_duration_seconds"
+            ),
         }
 
         source_alarm["snoozed_at"] = (
@@ -573,8 +668,55 @@ def handle_alarm_query(text):
     # --------------------------------------------------------
 
     if action == "set":
-        trigger_at = _parse_alarm_datetime(
+        playback_policy = (
+            parse_alarm_playback_policy(
+                text
+            )
+        )
+
+        if not playback_policy["success"]:
+            return {
+                "success": False,
+                "action": action,
+                "response": playback_policy[
+                    "error"
+                ],
+                "error": (
+                    "Invalid alarm playback duration."
+                ),
+            }
+
+        tone_request = _parse_requested_tone(
             text
+        )
+
+        if (
+            tone_request["requested"]
+            and tone_request["tone"] is None
+        ):
+            requested_name = (
+                tone_request["name"]
+                or "that"
+            )
+
+            return {
+                "success": False,
+                "action": action,
+                "response": (
+                    f"I couldn't find the {requested_name} "
+                    "alarm tone."
+                ),
+                "error": "Alarm tone not found.",
+            }
+
+        trigger_text = (
+            remove_alarm_playback_policy_language(
+                text
+            )
+        )
+
+        trigger_at = _parse_alarm_datetime(
+            trigger_text
         )
 
         if trigger_at is None:
@@ -597,6 +739,19 @@ def handle_alarm_query(text):
             "timezone": DEFAULT_TIMEZONE,
             "status": "active",
             "label": "Alarm",
+            "tone": (
+                tone_request["tone"]["filename"]
+                if tone_request["tone"]
+                else None
+            ),
+            "playback_mode": playback_policy[
+                "mode"
+            ],
+            "playback_duration_seconds": (
+                playback_policy[
+                    "duration_seconds"
+                ]
+            ),
         }
 
         alarms.append(
@@ -611,6 +766,31 @@ def handle_alarm_query(text):
             f"Alarm set for {_format_alarm_time(trigger_at)} "
             f"on {_format_alarm_date(trigger_at)}."
         )
+
+        if tone_request["tone"]:
+            response = (
+                response[:-1]
+                + " using the "
+                + tone_request["tone"]["name"]
+                + " tone."
+            )
+
+        if (
+            playback_policy["mode"]
+            == TIMED_MODE
+        ):
+            seconds = playback_policy[
+                "duration_seconds"
+            ]
+
+            response += (
+                f" It will ring for {seconds} "
+                f"{'second' if seconds == 1 else 'seconds'}."
+            )
+        else:
+            response += (
+                " It will ring until stopped or snoozed."
+            )
 
         return {
             "success": True,
@@ -877,17 +1057,46 @@ def _stop_linux_sound_process(process):
 def play_alarm_sound(
     repetitions=5,
     alarm_id=None,
+    tone=None,
+    playback_mode=None,
+    playback_duration_seconds=None,
 ):
     """
     Play SATURN's interruptible alarm sound.
 
-    Playback state is shared across processes so the API or voice
-    service can dismiss an alarm owned by the voice runtime.
+    New alarms use either timed playback or continue until explicitly
+    stopped or snoozed. Calls without a playback mode retain the
+    historical finite-repetition behavior for compatibility.
     """
 
     repetitions = max(
         1,
         int(repetitions),
+    )
+
+    legacy_playback = (
+        playback_mode is None
+    )
+
+    if legacy_playback:
+        resolved_mode = "legacy"
+        resolved_duration = None
+    else:
+        policy = normalize_saved_playback_policy(
+            playback_mode,
+            playback_duration_seconds,
+        )
+        resolved_mode = policy["mode"]
+        resolved_duration = policy[
+            "duration_seconds"
+        ]
+
+    tone_path = (
+        _resolve_playback_tone_path(
+            tone
+        )
+        if tone
+        else None
     )
 
     playback_generation = (
@@ -896,21 +1105,58 @@ def play_alarm_sound(
         )
     )
 
+    started_at = time.monotonic()
+    completed_repetitions = 0
+
+    def playback_should_continue():
+        if not refresh_alarm_playback(
+            playback_generation,
+            alarm_id=alarm_id,
+        ):
+            return False
+
+        if should_stop_alarm_playback(
+            playback_generation
+        ):
+            return False
+
+        if legacy_playback:
+            return (
+                completed_repetitions
+                < repetitions
+            )
+
+        if resolved_mode == TIMED_MODE:
+            return not timed_alarm_has_expired(
+                resolved_mode,
+                started_at=started_at,
+                current_time=time.monotonic(),
+                duration_seconds=resolved_duration,
+            )
+
+        return (
+            resolved_mode
+            == UNTIL_DISMISSED_MODE
+        )
+
     try:
         if (
             sys.platform.startswith("win")
             and winsound is not None
         ):
-            for _ in range(repetitions):
-                if should_stop_alarm_playback(
-                    playback_generation
-                ):
-                    break
-
+            while playback_should_continue():
                 try:
                     winsound.PlaySound(
-                        "SystemAlarm",
-                        winsound.SND_ALIAS
+                        (
+                            tone_path
+                            if tone_path
+                            else "SystemAlarm"
+                        ),
+                        (
+                            winsound.SND_FILENAME
+                            if tone_path
+                            else winsound.SND_ALIAS
+                        )
                         | winsound.SND_ASYNC,
                     )
                 except RuntimeError:
@@ -918,11 +1164,22 @@ def play_alarm_sound(
                         winsound.MB_ICONEXCLAMATION
                     )
 
-                if not _wait_for_alarm_interval(
-                    playback_generation,
-                    1,
+                completed_repetitions += 1
+
+                wait_deadline = (
+                    time.monotonic() + 1
+                )
+
+                while (
+                    time.monotonic()
+                    < wait_deadline
                 ):
-                    break
+                    if not playback_should_continue():
+                        break
+
+                    time.sleep(
+                        0.05
+                    )
 
             try:
                 winsound.PlaySound(
@@ -935,38 +1192,39 @@ def play_alarm_sound(
             return True
 
         if sys.platform.startswith("linux"):
-            for _ in range(repetitions):
-                if should_stop_alarm_playback(
-                    playback_generation
-                ):
-                    break
+            while playback_should_continue():
+                process = None
 
                 try:
                     process = subprocess.Popen(
-                        [
-                            "speaker-test",
-                            "-t",
-                            "sine",
-                            "-f",
-                            "880",
-                            "-l",
-                            "1",
-                        ],
+                        _linux_alarm_command(
+                            tone_path
+                        ),
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         start_new_session=True,
                     )
 
-                    deadline = (
-                        time.monotonic() + 3
+                    # speaker-test needs a defensive limit. A custom
+                    # WAV is allowed to finish naturally, while stop,
+                    # snooze, and timed expiration remain responsive.
+                    process_deadline = (
+                        None
+                        if tone_path
+                        else time.monotonic() + 3
                     )
 
-                    while (
-                        process.poll() is None
-                        and time.monotonic() < deadline
-                    ):
-                        if should_stop_alarm_playback(
-                            playback_generation
+                    while process.poll() is None:
+                        if not playback_should_continue():
+                            _stop_linux_sound_process(
+                                process
+                            )
+                            break
+
+                        if (
+                            process_deadline is not None
+                            and time.monotonic()
+                            >= process_deadline
                         ):
                             _stop_linux_sound_process(
                                 process
@@ -977,48 +1235,70 @@ def play_alarm_sound(
                             0.05
                         )
 
-                    if process.poll() is None:
-                        _stop_linux_sound_process(
-                            process
-                        )
-
                 except OSError:
                     print(
                         "\a",
                         end="",
                         flush=True,
                     )
+                finally:
+                    if (
+                        process is not None
+                        and process.poll() is None
+                    ):
+                        _stop_linux_sound_process(
+                            process
+                        )
 
-                if not _wait_for_alarm_interval(
-                    playback_generation,
-                    0.15,
+                completed_repetitions += 1
+
+                pause_deadline = (
+                    time.monotonic() + 0.15
+                )
+
+                while (
+                    time.monotonic()
+                    < pause_deadline
                 ):
-                    break
+                    if not playback_should_continue():
+                        break
+
+                    time.sleep(
+                        0.05
+                    )
 
             return True
 
-        for _ in range(repetitions):
-            if should_stop_alarm_playback(
-                playback_generation
-            ):
-                break
-
+        while playback_should_continue():
             print(
                 "\a",
                 end="",
                 flush=True,
             )
 
-            if not _wait_for_alarm_interval(
-                playback_generation,
-                0.5,
+            completed_repetitions += 1
+
+            wait_deadline = (
+                time.monotonic() + 0.5
+            )
+
+            while (
+                time.monotonic()
+                < wait_deadline
             ):
-                break
+                if not playback_should_continue():
+                    break
+
+                time.sleep(
+                    0.05
+                )
 
         return True
 
     finally:
-        finish_alarm_playback()
+        finish_alarm_playback(
+            alarm_id=alarm_id
+        )
 
 
 @_locked_alarm_operation

@@ -1,10 +1,14 @@
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from assistant_tools.alarm_tones import (
+    list_alarm_tones,
+)
 from assistant_tools.list_tool import get_all_lists
 from core.saturn_instance import get_saturn
 
@@ -56,7 +60,23 @@ class ListItemRequest(BaseModel):
 
 
 class AlarmCreateRequest(BaseModel):
-    time: str
+    time: str = Field(
+        min_length=1,
+        max_length=128,
+    )
+    tone: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+    playback_mode: Literal[
+        "timed",
+        "until_dismissed",
+    ] = "until_dismissed"
+    playback_duration_seconds: int | None = Field(
+        default=None,
+        ge=5,
+        le=1800,
+    )
 
 
 def _make_json_safe(value):
@@ -274,6 +294,22 @@ def delete_list(list_name: str):
 # ============================================================
 
 
+@app.get("/api/alarm-tones")
+def get_alarm_tones():
+    tones = list_alarm_tones()
+
+    return {
+        "success": True,
+        "tones": [
+            {
+                "name": tone["name"],
+                "filename": tone["filename"],
+            }
+            for tone in tones
+        ],
+    }
+
+
 @app.get("/api/alarms")
 def get_alarms():
     result = run_saturn_query(
@@ -291,8 +327,35 @@ def get_alarms():
 
 @app.post("/api/alarms")
 def create_alarm(request: AlarmCreateRequest):
+    query_parts = [
+        f"set an alarm for {request.time.strip()}"
+    ]
+
+    if request.tone:
+        query_parts.append(
+            f"with the {request.tone.strip()} tone"
+        )
+
+    if request.playback_mode == "timed":
+        duration = (
+            request.playback_duration_seconds
+            if request.playback_duration_seconds
+            is not None
+            else 30
+        )
+
+        query_parts.append(
+            f"for {duration} seconds"
+        )
+    else:
+        query_parts.append(
+            "until dismissed"
+        )
+
     result = run_saturn_query(
-        f"set an alarm for {request.time}"
+        " ".join(
+            query_parts
+        )
     )
 
     return {

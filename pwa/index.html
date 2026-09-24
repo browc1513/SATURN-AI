@@ -27,7 +27,7 @@
 
     <link
         rel="stylesheet"
-        href="/app/style.css?v=4"
+        href="/app/style.css?v=5"
     >
 </head>
 
@@ -258,6 +258,49 @@
                     autocomplete="off"
                 >
 
+                <select
+                    id="alarm-tone-select"
+                    class="item-input"
+                    aria-label="Alarm tone"
+                >
+                    <option value="">
+                        Default alarm tone
+                    </option>
+                </select>
+
+                <select
+                    id="alarm-playback-mode"
+                    class="item-input"
+                    aria-label="Alarm playback mode"
+                >
+                    <option value="until_dismissed">
+                        Ring until stopped or snoozed
+                    </option>
+                    <option value="timed">
+                        Ring for a set amount of time
+                    </option>
+                </select>
+
+                <div
+                    id="alarm-duration-container"
+                    class="hidden"
+                >
+                    <label for="alarm-duration-seconds">
+                        Ring duration in seconds
+                    </label>
+
+                    <input
+                        id="alarm-duration-seconds"
+                        class="item-input"
+                        type="number"
+                        value="30"
+                        min="5"
+                        max="1800"
+                        step="1"
+                        inputmode="numeric"
+                    >
+                </div>
+
                 <button
                     id="create-alarm-button"
                     class="add-item-button"
@@ -297,6 +340,6 @@
 
     </main>
 
-    <script src="/app/app.js?v=4"></script>
+    <script src="/app/app.js?v=5"></script>
 </body>
 </html>

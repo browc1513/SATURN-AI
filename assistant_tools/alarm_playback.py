@@ -220,6 +220,49 @@ def get_ringing_alarm_ids():
         )
 
 
+def refresh_alarm_playback(
+    playback_generation,
+    alarm_id=None,
+):
+    """
+    Refresh active playback without changing its generation.
+
+    Persistent alarms use this heartbeat so their shared playback
+    record does not become stale while they are still ringing.
+    """
+
+    with storage_transaction(
+        ALARM_PLAYBACK_STATE_FILE
+    ):
+        state = _load_state()
+
+        if (
+            state["generation"]
+            != playback_generation
+            or state["active_count"] <= 0
+        ):
+            return False
+
+        if alarm_id:
+            alarm_id = str(
+                alarm_id
+            )
+
+            if (
+                alarm_id
+                not in state["active_alarm_ids"]
+            ):
+                state["active_alarm_ids"].append(
+                    alarm_id
+                )
+
+        _save_state(
+            state
+        )
+
+        return True
+
+
 def stop_alarm_playback():
     """
     Request that every currently active alarm sound stop.

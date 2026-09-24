@@ -18,6 +18,14 @@ const createListButton = document.getElementById("create-list-button");
 const createAlarmForm = document.getElementById("create-alarm-form");
 const newAlarmTime = document.getElementById("new-alarm-time");
 const createAlarmButton = document.getElementById("create-alarm-button");
+const alarmToneSelect = document.getElementById("alarm-tone-select");
+const alarmPlaybackMode = document.getElementById("alarm-playback-mode");
+const alarmDurationContainer = document.getElementById(
+    "alarm-duration-container"
+);
+const alarmDurationSeconds = document.getElementById(
+    "alarm-duration-seconds"
+);
 const snoozeAlarmButton = document.getElementById(
     "snooze-alarm-button"
 );
@@ -74,11 +82,82 @@ async function showLists() {
 }
 
 
+async function loadAlarmTones() {
+    const response = await fetch(
+        "/api/alarm-tones",
+        {
+            cache: "no-store",
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            "Unable to load alarm tones."
+        );
+    }
+
+    const result = await response.json();
+    const tones = Array.isArray(result.tones)
+        ? result.tones
+        : [];
+
+    const previousValue = alarmToneSelect.value;
+
+    alarmToneSelect.replaceChildren();
+
+    const defaultOption = document.createElement(
+        "option"
+    );
+    defaultOption.value = "";
+    defaultOption.textContent = "Default alarm tone";
+    alarmToneSelect.appendChild(defaultOption);
+
+    for (const tone of tones) {
+        const option = document.createElement(
+            "option"
+        );
+
+        option.value = tone.name;
+        option.textContent = tone.name;
+        option.dataset.filename = tone.filename;
+
+        alarmToneSelect.appendChild(option);
+    }
+
+    if (
+        Array.from(alarmToneSelect.options).some(
+            (option) => option.value === previousValue
+        )
+    ) {
+        alarmToneSelect.value = previousValue;
+    }
+}
+
+
+function updateAlarmDurationVisibility() {
+    const timed = (
+        alarmPlaybackMode.value === "timed"
+    );
+
+    alarmDurationContainer.classList.toggle(
+        "hidden",
+        !timed
+    );
+
+    alarmDurationSeconds.disabled = !timed;
+}
+
+
 async function showAlarms() {
     hideAllViews();
     alarmsView.classList.remove("hidden");
 
-    await loadAlarms();
+    await Promise.all([
+        loadAlarms(),
+        loadAlarmTones(),
+    ]);
+
+    updateAlarmDurationVisibility();
 }
 
 
@@ -469,12 +548,28 @@ async function loadAlarms() {
 }
 
 
-async function createAlarm(time) {
+async function createAlarm(
+    time,
+    tone,
+    playbackMode,
+    durationSeconds
+) {
     const cleanTime = time.trim();
 
     if (!cleanTime) {
         return;
     }
+
+    const requestBody = {
+        time: cleanTime,
+        tone: tone || null,
+        playback_mode: playbackMode,
+        playback_duration_seconds: (
+            playbackMode === "timed"
+                ? durationSeconds
+                : null
+        ),
+    };
 
     const response = await fetch(
         "/api/alarms",
@@ -483,9 +578,9 @@ async function createAlarm(time) {
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                time: cleanTime,
-            }),
+            body: JSON.stringify(
+                requestBody
+            ),
         }
     );
 
@@ -780,28 +875,68 @@ stopAlarmButton.addEventListener(
 );
 
 
+alarmPlaybackMode.addEventListener(
+    "change",
+    updateAlarmDurationVisibility
+);
+
+updateAlarmDurationVisibility();
+
+
 createAlarmForm.addEventListener(
     "submit",
     async (event) => {
         event.preventDefault();
 
         const time = newAlarmTime.value.trim();
+        const tone = alarmToneSelect.value;
+        const playbackMode = alarmPlaybackMode.value;
+        const durationSeconds = Number.parseInt(
+            alarmDurationSeconds.value,
+            10
+        );
 
         if (!time) {
             return;
         }
 
+        if (
+            playbackMode === "timed"
+            && (
+                !Number.isInteger(durationSeconds)
+                || durationSeconds < 5
+                || durationSeconds > 1800
+            )
+        ) {
+            window.alert(
+                "Alarm duration must be between "
+                + "5 and 1800 seconds."
+            );
+            return;
+        }
+
         createAlarmButton.disabled = true;
         newAlarmTime.disabled = true;
+        alarmToneSelect.disabled = true;
+        alarmPlaybackMode.disabled = true;
+        alarmDurationSeconds.disabled = true;
 
         try {
-            await createAlarm(time);
+            await createAlarm(
+                time,
+                tone,
+                playbackMode,
+                durationSeconds
+            );
             newAlarmTime.value = "";
         } catch (error) {
             alert("SATURN could not set that alarm.");
         } finally {
             createAlarmButton.disabled = false;
             newAlarmTime.disabled = false;
+            alarmToneSelect.disabled = false;
+            alarmPlaybackMode.disabled = false;
+            updateAlarmDurationVisibility();
             newAlarmTime.focus();
         }
     }
