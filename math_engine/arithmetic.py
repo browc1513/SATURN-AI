@@ -95,6 +95,38 @@ def divide(a, b):
     return a / b
 
 
+def arithmetic_mean(values):
+    """
+    Return the arithmetic mean of a nonempty collection.
+
+    Example:
+        arithmetic_mean([2, 4, 6]) -> 4
+    """
+
+    if isinstance(
+        values,
+        (
+            str,
+            bytes,
+        ),
+    ):
+        raise TypeError(
+            "Mean values must be supplied as a collection."
+        )
+
+    parsed_values = [
+        parse_number(value)
+        for value in values
+    ]
+
+    if not parsed_values:
+        raise ValueError(
+            "At least one value is required to calculate a mean."
+        )
+
+    return sum(parsed_values) / len(parsed_values)
+
+
 # ============================================================
 # POWERS AND ROOTS
 # ============================================================

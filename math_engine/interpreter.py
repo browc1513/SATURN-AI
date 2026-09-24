@@ -219,8 +219,11 @@ SUBSYSTEM_KEYWORDS = {
     "arithmetic": {
         "add",
         "subtract",
+        "difference",
         "multiply",
         "divide",
+        "mean",
+        "average",
         "percentage",
         "percent",
         "factorial",

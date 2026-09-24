@@ -178,6 +178,7 @@ data/*.json.*.tmp
 # SATURN runtime data stays local to each machine
 /data/saturn_lists.json
 /data/saturn_alarms.json
+/data/saturn_alarm_playback.json
 
 # Locally installed Piper voice models
 /voice/models/piper/

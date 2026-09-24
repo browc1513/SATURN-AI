@@ -464,6 +464,67 @@ def _direct_trig_function_score(query, operation_name):
 
     return -15
 
+def _explicit_operation_intent_score(
+    query,
+    operation_name,
+):
+    """
+    Strongly score clear natural-language operation requests.
+
+    These patterns describe complete mathematical intentions rather
+    than isolated words, preventing unrelated registry operations
+    from winning because of generic words such as "of".
+    """
+
+    text = str(query).strip().lower()
+    operation_name = str(operation_name).lower()
+
+    number = r"[-+]?\d+(?:\.\d+)?"
+
+    intent_patterns = {
+        "subtract": [
+            (
+                rf"\bdifference\s+between\s+"
+                rf"{number}\s+and\s+{number}\b"
+            ),
+        ],
+        "factor_expression": [
+            (
+                r"\bfactor\s+"
+                r"(?:(?:the\s+)?(?:expression|polynomial)\s+)?"
+                r".*[a-z].*(?:\^|\*\*|[+\-*/])"
+            ),
+        ],
+        "arithmetic_mean": [
+            (
+                r"\b(?:mean|average)\s+of\s+"
+                r"[-+]?\d"
+            ),
+        ],
+    }
+
+    detected_operation = None
+
+    for target_operation, patterns in intent_patterns.items():
+        if any(
+            re.search(pattern, text)
+            for pattern in patterns
+        ):
+            detected_operation = target_operation
+            break
+
+    if detected_operation is None:
+        return 0
+
+    if operation_name == detected_operation:
+        return 80
+
+    if operation_name in intent_patterns:
+        return -20
+
+    return -10
+
+
 def find_math_operations(
     query,
     subsystem=None,
@@ -674,6 +735,15 @@ def find_math_operations(
         # ----------------------------------------------------
 
         score += _equation_structure_score(
+            query,
+            operation["name"]
+        )
+
+        # ----------------------------------------------------
+        # EXPLICIT NATURAL-LANGUAGE OPERATION INTENT
+        # ----------------------------------------------------
+
+        score += _explicit_operation_intent_score(
             query,
             operation["name"]
         )

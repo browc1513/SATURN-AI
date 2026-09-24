@@ -32,7 +32,8 @@ from math_engine.arithmetic import (
     ceiling_value,
     round_value,
     decimal_value,
-    scientific_notation
+    scientific_notation,
+    arithmetic_mean
 )
 
 from math_engine.algebra import (
@@ -390,6 +391,30 @@ def register_arithmetic_operations(registry):
             "difference"
         ],
         category="basic_arithmetic"
+    )
+
+    registry.register(
+        name="arithmetic_mean",
+        function=arithmetic_mean,
+        subsystem="arithmetic",
+        description="Calculate the arithmetic mean of a list of values.",
+        parameters={
+            "values": {
+                "type": "list",
+                "required": True,
+                "description": "Values to average"
+            }
+        },
+        returns={
+            "type": "expression",
+            "description": "Arithmetic mean of the values"
+        },
+        keywords=[
+            "arithmetic mean",
+            "mean",
+            "average"
+        ],
+        category="statistics"
     )
 
     registry.register(

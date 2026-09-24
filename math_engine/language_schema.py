@@ -270,6 +270,7 @@ BOUNDS_PARAMETERS = {
 
 
 LIST_PARAMETERS = {
+    "values",
     "side_lengths",
     "intervals",
     "components",

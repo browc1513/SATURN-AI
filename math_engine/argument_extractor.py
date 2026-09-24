@@ -2591,6 +2591,9 @@ def extract_semantic_arguments_for_operation(
                 rf"({NUMBER_PATTERN})\s*-\s*({NUMBER_PATTERN})",
                 rf"\bsubtract\s+({NUMBER_PATTERN})\s+from\s+"
                 rf"({NUMBER_PATTERN})\b",
+                rf"\bdifference\s+between\s+"
+                rf"({NUMBER_PATTERN})\s+and\s+"
+                rf"({NUMBER_PATTERN})\b",
             ]
 
         elif operation_name == "divide":
@@ -2636,6 +2639,38 @@ def extract_semantic_arguments_for_operation(
                     result["b"] = second
 
                 break
+
+    # --------------------------------------------------------
+    # ARITHMETIC MEAN / AVERAGE
+    # --------------------------------------------------------
+
+    if (
+        operation_name == "arithmetic_mean"
+        and "values" in parameter_set
+    ):
+        match = re.search(
+            (
+                r"\b(?:mean|average)\s+of\s+"
+                r"(.+?)(?:[.?!]|$)"
+            ),
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        if match is not None:
+            value_text = re.sub(
+                r"\s*,?\s+and\s+",
+                ", ",
+                match.group(1),
+                flags=re.IGNORECASE,
+            )
+
+            values = _parse_generic_list(
+                value_text
+            )
+
+            if values is not None:
+                result["values"] = values
 
     # --------------------------------------------------------
     # POWER LANGUAGE
