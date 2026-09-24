@@ -1,5 +1,6 @@
 from core.saturn_instance import get_saturn
 from voice.conversation_control import (
+    is_silent_follow_up_timeout,
     load_voice_timing,
     should_listen_for_follow_up,
 )
@@ -168,6 +169,15 @@ def main():
                 )
 
                 if not speech_result["success"]:
+                    if is_silent_follow_up_timeout(
+                        speech_result
+                    ):
+                        print(
+                            "Follow-up window closed."
+                        )
+                        print()
+                        break
+
                     response = speech_result[
                         "response"
                     ]

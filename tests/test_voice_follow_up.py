@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 VOICE_ASSISTANT_PATH = Path(
@@ -34,3 +34,10 @@ def test_voice_assistant_has_follow_up_loop():
         "session_id=VOICE_SESSION_ID"
         in source
     )
+
+
+def test_idle_follow_up_timeout_closes_without_speaking():
+    source = read_voice_source()
+
+    assert "is_silent_follow_up_timeout(" in source
+    assert '"Follow-up window closed."' in source

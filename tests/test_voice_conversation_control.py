@@ -1,6 +1,7 @@
-﻿import pytest
+import pytest
 
 from voice.conversation_control import (
+    is_silent_follow_up_timeout,
     load_voice_timing,
     should_listen_for_follow_up,
 )
@@ -101,5 +102,74 @@ def test_completed_actions_do_not_require_follow_up(
     result,
 ):
     assert should_listen_for_follow_up(
+        result
+    ) is False
+
+
+def test_successful_conversation_opens_follow_up_window():
+    result = {
+        "success": True,
+        "domain": "conversation",
+        "response": "Conversational response.",
+        "data": {
+            "provider": "ollama",
+        },
+    }
+
+    assert should_listen_for_follow_up(
+        result
+    ) is True
+
+
+def test_failed_conversation_does_not_open_follow_up():
+    result = {
+        "success": False,
+        "domain": "conversation",
+        "response": "Model unavailable.",
+        "data": None,
+    }
+
+    assert should_listen_for_follow_up(
+        result
+    ) is False
+
+
+def test_explicit_follow_up_flag_is_supported():
+    result = {
+        "success": True,
+        "domain": "control",
+        "response": "Please answer.",
+        "data": {
+            "follow_up_required": True,
+        },
+    }
+
+    assert should_listen_for_follow_up(
+        result
+    ) is True
+
+
+def test_idle_follow_up_timeout_closes_silently():
+    result = {
+        "success": False,
+        "text": "",
+        "response": "I didn't hear anything.",
+        "error": "Microphone listening timed out.",
+    }
+
+    assert is_silent_follow_up_timeout(
+        result
+    ) is True
+
+
+def test_non_timeout_stt_error_is_not_silent():
+    result = {
+        "success": False,
+        "text": "",
+        "response": "Microphone unavailable.",
+        "error": "No microphone.",
+    }
+
+    assert is_silent_follow_up_timeout(
         result
     ) is False
