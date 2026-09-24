@@ -1,16 +1,12 @@
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from assistant_tools.alarm_tones import (
     DEFAULT_ALARM_TONE_NAME,
-    MAX_ALARM_TONE_BYTES,
-    delete_alarm_tone,
-    install_alarm_tone,
     list_alarm_tones,
-    rename_alarm_tone,
     resolve_alarm_tone,
 )
 from assistant_tools.list_tool import get_all_lists
@@ -75,13 +71,6 @@ class AlarmCreateRequest(BaseModel):
     alarm_type: str = Field(
         default="wake_up",
         pattern=r"^(?:reminder|wake_up)$",
-    )
-
-
-class AlarmToneRenameRequest(BaseModel):
-    name: str = Field(
-        min_length=1,
-        max_length=84,
     )
 
 
@@ -317,80 +306,8 @@ def get_alarm_tones():
     }
 
 
-@app.post("/api/alarm-tones")
-async def upload_alarm_tone(
-    request: Request,
-    name: str,
-):
-    content_length = request.headers.get(
-        "content-length"
-    )
-
-    try:
-        declared_length = (
-            int(content_length)
-            if content_length is not None
-            else None
-        )
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid Content-Length header.",
-        ) from error
-
-    if (
-        declared_length is not None
-        and declared_length
-        > MAX_ALARM_TONE_BYTES
-    ):
-        raise HTTPException(
-            status_code=413,
-            detail="The WAV file exceeds the 10 MB limit.",
-        )
-
-    wav_data = await request.body()
-
-    try:
-        tone = install_alarm_tone(
-            name,
-            wav_data,
-        )
-    except FileExistsError as error:
-        raise HTTPException(
-            status_code=409,
-            detail=str(error),
-        ) from error
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
-    except OSError as error:
-        raise HTTPException(
-            status_code=500,
-            detail="The alarm tone could not be installed.",
-        ) from error
-
-    return {
-        "success": True,
-        "tone": {
-            "name": tone["name"],
-            "filename": tone["filename"],
-            "channels": tone["channels"],
-            "sample_bits": tone["sample_bits"],
-            "sample_rate": tone["sample_rate"],
-            "duration_seconds": tone[
-                "duration_seconds"
-            ],
-            "size_bytes": tone["size_bytes"],
-        },
-    }
-
-
 @app.get("/api/alarm-tones/{tone_name}")
-def preview_alarm_tone(
-    tone_name: str,
-):
+def preview_alarm_tone(tone_name: str):
     tone = resolve_alarm_tone(
         tone_name
     )
@@ -398,91 +315,17 @@ def preview_alarm_tone(
     if tone is None:
         raise HTTPException(
             status_code=404,
-            detail="Alarm tone was not found.",
+            detail="Alarm tone not found.",
         )
 
     return FileResponse(
         tone["path"],
         media_type="audio/wav",
+        filename=tone["filename"],
         headers={
             "Cache-Control": "no-store",
         },
     )
-
-
-@app.patch("/api/alarm-tones/{tone_name}")
-def rename_existing_alarm_tone(
-    tone_name: str,
-    request: AlarmToneRenameRequest,
-):
-    try:
-        tone = rename_alarm_tone(
-            tone_name,
-            request.name,
-        )
-    except FileNotFoundError as error:
-        raise HTTPException(
-            status_code=404,
-            detail=str(error),
-        ) from error
-    except PermissionError as error:
-        raise HTTPException(
-            status_code=403,
-            detail=str(error),
-        ) from error
-    except FileExistsError as error:
-        raise HTTPException(
-            status_code=409,
-            detail=str(error),
-        ) from error
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
-    except OSError as error:
-        raise HTTPException(
-            status_code=500,
-            detail="The alarm tone could not be renamed.",
-        ) from error
-
-    return {
-        "success": True,
-        "tone": {
-            "name": tone["name"],
-            "filename": tone["filename"],
-        },
-    }
-
-
-@app.delete("/api/alarm-tones/{tone_name}")
-def delete_existing_alarm_tone(
-    tone_name: str,
-):
-    try:
-        tone = delete_alarm_tone(
-            tone_name
-        )
-    except FileNotFoundError as error:
-        raise HTTPException(
-            status_code=404,
-            detail=str(error),
-        ) from error
-    except PermissionError as error:
-        raise HTTPException(
-            status_code=403,
-            detail=str(error),
-        ) from error
-    except OSError as error:
-        raise HTTPException(
-            status_code=500,
-            detail="The alarm tone could not be deleted.",
-        ) from error
-
-    return {
-        "success": True,
-        "tone": tone,
-    }
 
 
 @app.get("/api/alarms")

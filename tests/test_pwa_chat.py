@@ -58,7 +58,7 @@ def test_service_worker_uses_v5_cache():
         "service-worker.js"
     )
 
-    assert 'CACHE_NAME = "saturn-pwa-v7"' in (
+    assert 'CACHE_NAME = "saturn-pwa-v8"' in (
         service_worker
     )
 
@@ -72,11 +72,11 @@ def test_pwa_assets_use_matching_v4_cache_urls():
         "pwa/service-worker.js"
     ).read_text(encoding="utf-8")
 
-    assert 'href="/app/style.css?v=7"' in index
-    assert 'src="/app/app.js?v=7"' in index
-    assert 'saturn-pwa-v7' in worker
-    assert '"/app/style.css?v=7"' in worker
-    assert '"/app/app.js?v=7"' in worker
+    assert 'href="/app/style.css?v=8"' in index
+    assert 'src="/app/app.js?v=8"' in index
+    assert 'saturn-pwa-v8' in worker
+    assert '"/app/style.css?v=8"' in worker
+    assert '"/app/app.js?v=8"' in worker
     assert (
         'fetch(event.request, { cache: "no-store" })'
         in worker
