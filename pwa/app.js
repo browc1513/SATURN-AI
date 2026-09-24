@@ -18,6 +18,12 @@ const createListButton = document.getElementById("create-list-button");
 const createAlarmForm = document.getElementById("create-alarm-form");
 const newAlarmTime = document.getElementById("new-alarm-time");
 const createAlarmButton = document.getElementById("create-alarm-button");
+const snoozeAlarmButton = document.getElementById(
+    "snooze-alarm-button"
+);
+const stopAlarmButton = document.getElementById(
+    "stop-alarm-button"
+);
 
 
 async function checkSaturnStatus() {
@@ -497,6 +503,61 @@ async function createAlarm(time) {
 }
 
 
+async function controlRingingAlarm(action) {
+    const response = await fetch(
+        `/api/alarms/${action}`,
+        {
+            method: "POST",
+        }
+    );
+
+    const data = await response.json();
+
+    if (
+        !response.ok
+        || !data.success
+        || !data.result?.success
+    ) {
+        throw new Error(
+            data.result?.response
+            ?? "SATURN could not control the alarm."
+        );
+    }
+
+    return data.result;
+}
+
+
+async function runAlarmControl(
+    action,
+    button,
+) {
+    snoozeAlarmButton.disabled = true;
+    stopAlarmButton.disabled = true;
+
+    try {
+        const result = await controlRingingAlarm(
+            action
+        );
+
+        alert(
+            result.response
+            ?? "Alarm command completed."
+        );
+
+        await loadAlarms();
+    } catch (error) {
+        alert(
+            error.message
+            ?? "SATURN could not control the alarm."
+        );
+    } finally {
+        snoozeAlarmButton.disabled = false;
+        stopAlarmButton.disabled = false;
+    }
+}
+
+
 async function cancelAlarm(alarmTime) {
     const response = await fetch(
         `/api/alarms/${encodeURIComponent(alarmTime)}`,
@@ -693,6 +754,28 @@ createListForm.addEventListener(
             newListName.disabled = false;
             newListName.focus();
         }
+    }
+);
+
+
+snoozeAlarmButton.addEventListener(
+    "click",
+    async () => {
+        await runAlarmControl(
+            "snooze",
+            snoozeAlarmButton,
+        );
+    }
+);
+
+
+stopAlarmButton.addEventListener(
+    "click",
+    async () => {
+        await runAlarmControl(
+            "stop",
+            stopAlarmButton,
+        );
     }
 );
 

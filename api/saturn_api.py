@@ -304,6 +304,36 @@ def create_alarm(request: AlarmCreateRequest):
     }
 
 
+@app.post("/api/alarms/stop")
+def stop_ringing_alarm():
+    result = run_saturn_query(
+        "stop the alarm"
+    )
+
+    return {
+        "success": result.get(
+            "success",
+            False,
+        ),
+        "result": result,
+    }
+
+
+@app.post("/api/alarms/snooze")
+def snooze_ringing_alarm():
+    result = run_saturn_query(
+        "snooze the alarm for 10 minutes"
+    )
+
+    return {
+        "success": result.get(
+            "success",
+            False,
+        ),
+        "result": result,
+    }
+
+
 @app.delete("/api/alarms")
 def cancel_all_alarms():
     result = run_saturn_query(
