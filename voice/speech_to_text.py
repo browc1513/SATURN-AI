@@ -23,6 +23,10 @@ def listen_once(
     timeout=5,
     phrase_time_limit=15,
     language=DEFAULT_LANGUAGE,
+    pause_threshold=1.25,
+    phrase_threshold=0.25,
+    non_speaking_duration=0.5,
+    ambient_duration=0.4,
 ):
     """
     Listen for one spoken request and return a structured result.
@@ -50,13 +54,41 @@ def listen_once(
 
     recognizer = sr.Recognizer()
 
+    recognizer.dynamic_energy_threshold = True
+    recognizer.pause_threshold = float(
+        pause_threshold
+    )
+    recognizer.phrase_threshold = float(
+        phrase_threshold
+    )
+    recognizer.non_speaking_duration = float(
+        non_speaking_duration
+    )
+
+    if (
+        recognizer.non_speaking_duration
+        > recognizer.pause_threshold
+    ):
+        return {
+            "success": False,
+            "text": "",
+            "response": (
+                "Speech timing configuration is invalid."
+            ),
+            "error": (
+                "Non-speaking duration cannot exceed "
+                "the pause threshold."
+            ),
+        }
+
     try:
         with sr.Microphone() as source:
-            # Briefly sample the room so normal background noise
-            # does not get interpreted as speech.
+            # Briefly sample current room noise before listening.
             recognizer.adjust_for_ambient_noise(
                 source,
-                duration=0.5,
+                duration=float(
+                    ambient_duration
+                ),
             )
 
             audio = recognizer.listen(

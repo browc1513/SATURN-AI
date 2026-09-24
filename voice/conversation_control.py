@@ -8,10 +8,14 @@ conversation flow to be tested silently on any development computer.
 import os
 
 
-DEFAULT_COMMAND_TIMEOUT = 8.0
-DEFAULT_COMMAND_PHRASE_LIMIT = 25.0
-DEFAULT_FOLLOW_UP_TIMEOUT = 10.0
-DEFAULT_FOLLOW_UP_PHRASE_LIMIT = 10.0
+DEFAULT_COMMAND_TIMEOUT = 10.0
+DEFAULT_COMMAND_PHRASE_LIMIT = 30.0
+DEFAULT_FOLLOW_UP_TIMEOUT = 8.0
+DEFAULT_FOLLOW_UP_PHRASE_LIMIT = 20.0
+DEFAULT_PAUSE_THRESHOLD = 1.25
+DEFAULT_PHRASE_THRESHOLD = 0.25
+DEFAULT_NON_SPEAKING_DURATION = 0.5
+DEFAULT_AMBIENT_DURATION = 0.4
 
 FOLLOW_UP_ACTIONS = {
     "reboot_requested",
@@ -78,6 +82,26 @@ def load_voice_timing(environment=None):
             environment,
             "SATURN_VOICE_FOLLOW_UP_PHRASE_LIMIT",
             DEFAULT_FOLLOW_UP_PHRASE_LIMIT,
+        ),
+        "pause_threshold": _positive_seconds(
+            environment,
+            "SATURN_VOICE_PAUSE_THRESHOLD",
+            DEFAULT_PAUSE_THRESHOLD,
+        ),
+        "phrase_threshold": _positive_seconds(
+            environment,
+            "SATURN_VOICE_PHRASE_THRESHOLD",
+            DEFAULT_PHRASE_THRESHOLD,
+        ),
+        "non_speaking_duration": _positive_seconds(
+            environment,
+            "SATURN_VOICE_NON_SPEAKING_DURATION",
+            DEFAULT_NON_SPEAKING_DURATION,
+        ),
+        "ambient_duration": _positive_seconds(
+            environment,
+            "SATURN_VOICE_AMBIENT_DURATION",
+            DEFAULT_AMBIENT_DURATION,
         ),
     }
 

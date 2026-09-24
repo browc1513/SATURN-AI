@@ -11,10 +11,14 @@ def test_default_voice_timing():
     timing = load_voice_timing({})
 
     assert timing == {
-        "command_timeout": 8.0,
-        "command_phrase_limit": 25.0,
-        "follow_up_timeout": 10.0,
-        "follow_up_phrase_limit": 10.0,
+        "command_timeout": 10.0,
+        "command_phrase_limit": 30.0,
+        "follow_up_timeout": 8.0,
+        "follow_up_phrase_limit": 20.0,
+        "pause_threshold": 1.25,
+        "phrase_threshold": 0.25,
+        "non_speaking_duration": 0.5,
+        "ambient_duration": 0.4,
     }
 
 
@@ -25,6 +29,10 @@ def test_voice_timing_accepts_environment_overrides():
             "SATURN_VOICE_COMMAND_PHRASE_LIMIT": "30",
             "SATURN_VOICE_FOLLOW_UP_TIMEOUT": "7",
             "SATURN_VOICE_FOLLOW_UP_PHRASE_LIMIT": "5",
+            "SATURN_VOICE_PAUSE_THRESHOLD": "1.5",
+            "SATURN_VOICE_PHRASE_THRESHOLD": "0.4",
+            "SATURN_VOICE_NON_SPEAKING_DURATION": "0.6",
+            "SATURN_VOICE_AMBIENT_DURATION": "0.3",
         }
     )
 
@@ -33,6 +41,10 @@ def test_voice_timing_accepts_environment_overrides():
         "command_phrase_limit": 30.0,
         "follow_up_timeout": 7.0,
         "follow_up_phrase_limit": 5.0,
+        "pause_threshold": 1.5,
+        "phrase_threshold": 0.4,
+        "non_speaking_duration": 0.6,
+        "ambient_duration": 0.3,
     }
 
 

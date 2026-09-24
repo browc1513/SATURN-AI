@@ -148,6 +148,18 @@ def main():
                 phrase_time_limit=voice_timing[
                     "command_phrase_limit"
                 ],
+                pause_threshold=voice_timing[
+                    "pause_threshold"
+                ],
+                phrase_threshold=voice_timing[
+                    "phrase_threshold"
+                ],
+                non_speaking_duration=voice_timing[
+                    "non_speaking_duration"
+                ],
+                ambient_duration=voice_timing[
+                    "ambient_duration"
+                ],
             )
 
             # --------------------------------------------------
@@ -230,6 +242,18 @@ def main():
                     ],
                     phrase_time_limit=voice_timing[
                         "follow_up_phrase_limit"
+                    ],
+                    pause_threshold=voice_timing[
+                        "pause_threshold"
+                    ],
+                    phrase_threshold=voice_timing[
+                        "phrase_threshold"
+                    ],
+                    non_speaking_duration=voice_timing[
+                        "non_speaking_duration"
+                    ],
+                    ambient_duration=voice_timing[
+                        "ambient_duration"
                     ],
                 )
 
