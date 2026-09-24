@@ -27,7 +27,7 @@
 
     <link
         rel="stylesheet"
-        href="/app/style.css?v=6"
+        href="/app/style.css?v=7"
     >
 </head>
 
@@ -290,6 +290,69 @@
                 </button>
             </form>
 
+            <section class="alarm-tone-manager">
+                <div>
+                    <p class="section-label">
+                        ALARM TONES
+                    </p>
+
+                    <p class="alarm-tone-help">
+                        Upload compatible WAV tones or manage the
+                        currently selected tone. Preview plays on
+                        this device.
+                    </p>
+                </div>
+
+                <input
+                    id="alarm-tone-file"
+                    class="item-input"
+                    type="file"
+                    accept=".wav,audio/wav"
+                    aria-label="Select WAV alarm tone"
+                >
+
+                <div class="alarm-tone-actions">
+                    <button
+                        id="upload-alarm-tone-button"
+                        class="list-control-button"
+                        type="button"
+                    >
+                        Upload WAV
+                    </button>
+
+                    <button
+                        id="preview-alarm-tone-button"
+                        class="list-control-button"
+                        type="button"
+                    >
+                        Preview Selected
+                    </button>
+
+                    <button
+                        id="rename-alarm-tone-button"
+                        class="list-control-button"
+                        type="button"
+                    >
+                        Rename Selected
+                    </button>
+
+                    <button
+                        id="delete-alarm-tone-button"
+                        class="list-control-button delete-list-button"
+                        type="button"
+                    >
+                        Delete Selected
+                    </button>
+                </div>
+
+                <p
+                    id="alarm-tone-status"
+                    class="alarm-tone-status"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+            </section>
+
             <div class="alarm-toolbar">
                 <button
                     id="snooze-alarm-button"
@@ -320,6 +383,6 @@
 
     </main>
 
-    <script src="/app/app.js?v=6"></script>
+    <script src="/app/app.js?v=7"></script>
 </body>
 </html>

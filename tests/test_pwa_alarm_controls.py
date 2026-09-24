@@ -82,7 +82,7 @@ def test_pwa_connects_alarm_controls_to_api():
     assert '"stop"' in app
 
 
-def test_pwa_alarm_controls_use_v6_assets():
+def test_pwa_alarm_controls_use_v7_assets():
     index = Path(
         "pwa/index.html"
     ).read_text(encoding="utf-8")
@@ -91,8 +91,8 @@ def test_pwa_alarm_controls_use_v6_assets():
         "pwa/service-worker.js"
     ).read_text(encoding="utf-8")
 
-    assert 'app.js?v=6' in index
-    assert 'style.css?v=6' in index
-    assert 'saturn-pwa-v6' in worker
-    assert 'app.js?v=6' in worker
-    assert 'style.css?v=6' in worker
+    assert 'app.js?v=7' in index
+    assert 'style.css?v=7' in index
+    assert 'saturn-pwa-v7' in worker
+    assert 'app.js?v=7' in worker
+    assert 'style.css?v=7' in worker

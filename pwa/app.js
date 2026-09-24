@@ -22,6 +22,24 @@ const alarmToneSelect = document.getElementById("alarm-tone-select");
 const alarmTypeSelect = document.getElementById(
     "alarm-type-select"
 );
+const alarmToneFile = document.getElementById(
+    "alarm-tone-file"
+);
+const uploadAlarmToneButton = document.getElementById(
+    "upload-alarm-tone-button"
+);
+const previewAlarmToneButton = document.getElementById(
+    "preview-alarm-tone-button"
+);
+const renameAlarmToneButton = document.getElementById(
+    "rename-alarm-tone-button"
+);
+const deleteAlarmToneButton = document.getElementById(
+    "delete-alarm-tone-button"
+);
+const alarmToneStatus = document.getElementById(
+    "alarm-tone-status"
+);
 const snoozeAlarmButton = document.getElementById(
     "snooze-alarm-button"
 );
@@ -103,6 +121,7 @@ async function loadAlarmTones() {
 
     const previousValue = alarmToneSelect.value;
 
+    alarmToneSelect.dataset.defaultTone = defaultTone;
     alarmToneSelect.replaceChildren();
 
     const defaultOption = document.createElement(
@@ -135,6 +154,278 @@ async function loadAlarmTones() {
         )
     ) {
         alarmToneSelect.value = previousValue;
+    }
+
+    updateAlarmToneManagementState();
+}
+
+
+function getSelectedAlarmToneName() {
+    return (
+        alarmToneSelect.value
+        || alarmToneSelect.dataset.defaultTone
+        || "Saturn Alarm 1"
+    );
+}
+
+
+function setAlarmToneStatus(
+    message,
+    isError = false,
+) {
+    alarmToneStatus.textContent = message;
+    alarmToneStatus.classList.toggle(
+        "error-message",
+        isError,
+    );
+}
+
+
+function updateAlarmToneManagementState() {
+    const selectedTone = getSelectedAlarmToneName();
+    const defaultTone = (
+        alarmToneSelect.dataset.defaultTone
+        || "Saturn Alarm 1"
+    );
+    const defaultSelected = (
+        selectedTone === defaultTone
+    );
+
+    previewAlarmToneButton.disabled = !selectedTone;
+    renameAlarmToneButton.disabled = defaultSelected;
+    deleteAlarmToneButton.disabled = defaultSelected;
+    uploadAlarmToneButton.disabled = (
+        !alarmToneFile.files?.length
+    );
+}
+
+
+function getUploadToneName(file) {
+    return file.name.replace(
+        /\.wav$/i,
+        "",
+    );
+}
+
+
+async function uploadAlarmTone() {
+    const file = alarmToneFile.files?.[0];
+
+    if (!file) {
+        throw new Error(
+            "Choose a WAV file before uploading."
+        );
+    }
+
+    if (!/\.wav$/i.test(file.name)) {
+        throw new Error(
+            "The alarm tone must be a WAV file."
+        );
+    }
+
+    const toneName = getUploadToneName(file);
+    const audioData = await file.arrayBuffer();
+
+    const response = await fetch(
+        (
+            "/api/alarm-tones?name="
+            + encodeURIComponent(toneName)
+        ),
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "audio/wav",
+            },
+            body: audioData,
+        }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+        throw new Error(
+            result.detail
+            || "SATURN could not upload that tone."
+        );
+    }
+
+    await loadAlarmTones();
+    alarmToneSelect.value = result.tone.name;
+    alarmToneFile.value = "";
+    updateAlarmToneManagementState();
+
+    return result.tone;
+}
+
+
+async function previewSelectedAlarmTone() {
+    const toneName = getSelectedAlarmToneName();
+
+    if (!toneName) {
+        throw new Error(
+            "Choose an alarm tone to preview."
+        );
+    }
+
+    const audio = new Audio(
+        (
+            "/api/alarm-tones/"
+            + encodeURIComponent(toneName)
+        )
+    );
+
+    await audio.play();
+}
+
+
+async function renameSelectedAlarmTone() {
+    const currentName = getSelectedAlarmToneName();
+    const defaultTone = (
+        alarmToneSelect.dataset.defaultTone
+        || "Saturn Alarm 1"
+    );
+
+    if (currentName === defaultTone) {
+        throw new Error(
+            "The default alarm tone cannot be renamed."
+        );
+    }
+
+    const requestedName = window.prompt(
+        "Enter the new alarm tone name:",
+        currentName,
+    );
+
+    if (requestedName === null) {
+        return null;
+    }
+
+    const newName = requestedName.trim();
+
+    if (!newName || newName === currentName) {
+        return null;
+    }
+
+    const response = await fetch(
+        (
+            "/api/alarm-tones/"
+            + encodeURIComponent(currentName)
+        ),
+        {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(
+                {
+                    name: newName,
+                }
+            ),
+        }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+        throw new Error(
+            result.detail
+            || "SATURN could not rename that tone."
+        );
+    }
+
+    await loadAlarmTones();
+    alarmToneSelect.value = result.tone.name;
+    updateAlarmToneManagementState();
+
+    return result.tone;
+}
+
+
+async function deleteSelectedAlarmTone() {
+    const toneName = getSelectedAlarmToneName();
+    const defaultTone = (
+        alarmToneSelect.dataset.defaultTone
+        || "Saturn Alarm 1"
+    );
+
+    if (toneName === defaultTone) {
+        throw new Error(
+            "The default alarm tone cannot be deleted."
+        );
+    }
+
+    const confirmed = window.confirm(
+        `Delete the alarm tone "${toneName}"?`
+    );
+
+    if (!confirmed) {
+        return null;
+    }
+
+    const response = await fetch(
+        (
+            "/api/alarm-tones/"
+            + encodeURIComponent(toneName)
+        ),
+        {
+            method: "DELETE",
+        }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+        throw new Error(
+            result.detail
+            || "SATURN could not delete that tone."
+        );
+    }
+
+    alarmToneSelect.value = "";
+    await loadAlarmTones();
+
+    return result;
+}
+
+
+async function runAlarmToneAction(
+    action,
+    progressMessage,
+    successMessage,
+) {
+    const buttons = [
+        uploadAlarmToneButton,
+        previewAlarmToneButton,
+        renameAlarmToneButton,
+        deleteAlarmToneButton,
+    ];
+
+    for (const button of buttons) {
+        button.disabled = true;
+    }
+
+    setAlarmToneStatus(
+        progressMessage,
+    );
+
+    try {
+        const result = await action();
+
+        if (result !== null) {
+            setAlarmToneStatus(
+                successMessage,
+            );
+        } else {
+            setAlarmToneStatus("");
+        }
+    } catch (error) {
+        setAlarmToneStatus(
+            error.message
+            || "SATURN could not manage that tone.",
+            true,
+        );
+    } finally {
+        updateAlarmToneManagementState();
     }
 }
 
@@ -832,6 +1123,72 @@ createListForm.addEventListener(
             newListName.disabled = false;
             newListName.focus();
         }
+    }
+);
+
+
+alarmToneSelect.addEventListener(
+    "change",
+    () => {
+        setAlarmToneStatus("");
+        updateAlarmToneManagementState();
+    }
+);
+
+
+alarmToneFile.addEventListener(
+    "change",
+    () => {
+        setAlarmToneStatus("");
+        updateAlarmToneManagementState();
+    }
+);
+
+
+uploadAlarmToneButton.addEventListener(
+    "click",
+    async () => {
+        await runAlarmToneAction(
+            uploadAlarmTone,
+            "Uploading alarm tone...",
+            "Alarm tone uploaded.",
+        );
+    }
+);
+
+
+previewAlarmToneButton.addEventListener(
+    "click",
+    async () => {
+        await runAlarmToneAction(
+            previewSelectedAlarmTone,
+            "Starting preview...",
+            "Preview started on this device.",
+        );
+    }
+);
+
+
+renameAlarmToneButton.addEventListener(
+    "click",
+    async () => {
+        await runAlarmToneAction(
+            renameSelectedAlarmTone,
+            "Renaming alarm tone...",
+            "Alarm tone renamed.",
+        );
+    }
+);
+
+
+deleteAlarmToneButton.addEventListener(
+    "click",
+    async () => {
+        await runAlarmToneAction(
+            deleteSelectedAlarmTone,
+            "Deleting alarm tone...",
+            "Alarm tone deleted.",
+        );
     }
 );
 
