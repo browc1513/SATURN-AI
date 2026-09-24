@@ -1,4 +1,4 @@
-﻿"""
+"""
 Cross-process playback state for SATURN alarms.
 
 The voice service owns sound playback, while commands can arrive
@@ -45,6 +45,7 @@ def _default_state():
     return {
         "generation": 0,
         "active_count": 0,
+        "active_alarm_ids": [],
         "updated_at": _utc_now().isoformat(),
     }
 
@@ -110,15 +111,31 @@ def _load_state():
     ):
         age = STALE_PLAYBACK_SECONDS + 1
 
+    active_alarm_ids = state.get(
+        "active_alarm_ids",
+        [],
+    )
+
+    if not isinstance(active_alarm_ids, list):
+        active_alarm_ids = []
+
+    active_alarm_ids = [
+        str(alarm_id)
+        for alarm_id in active_alarm_ids
+        if alarm_id
+    ]
+
     if (
         active_count
         and age > STALE_PLAYBACK_SECONDS
     ):
         active_count = 0
+        active_alarm_ids = []
 
     return {
         "generation": generation,
         "active_count": active_count,
+        "active_alarm_ids": active_alarm_ids,
         "updated_at": str(updated_at or ""),
     }
 
@@ -134,7 +151,9 @@ def _save_state(state):
     )
 
 
-def begin_alarm_playback():
+def begin_alarm_playback(
+    alarm_id=None,
+):
     os.makedirs(
         DATA_DIR,
         exist_ok=True,
@@ -145,12 +164,23 @@ def begin_alarm_playback():
     ):
         state = _load_state()
         state["active_count"] += 1
+
+        if alarm_id:
+            alarm_id = str(alarm_id)
+
+            if alarm_id not in state["active_alarm_ids"]:
+                state["active_alarm_ids"].append(
+                    alarm_id
+                )
+
         _save_state(state)
 
         return state["generation"]
 
 
-def finish_alarm_playback():
+def finish_alarm_playback(
+    alarm_id=None,
+):
     with storage_transaction(
         ALARM_PLAYBACK_STATE_FILE
     ):
@@ -159,7 +189,35 @@ def finish_alarm_playback():
             0,
             state["active_count"] - 1,
         )
+
+        if alarm_id:
+            alarm_id = str(alarm_id)
+
+            state["active_alarm_ids"] = [
+                active_alarm_id
+                for active_alarm_id
+                in state["active_alarm_ids"]
+                if active_alarm_id != alarm_id
+            ]
+
+        if state["active_count"] == 0:
+            state["active_alarm_ids"] = []
+
         _save_state(state)
+
+
+def get_ringing_alarm_ids():
+    with storage_transaction(
+        ALARM_PLAYBACK_STATE_FILE
+    ):
+        state = _load_state()
+
+        if state["active_count"] <= 0:
+            return []
+
+        return list(
+            state["active_alarm_ids"]
+        )
 
 
 def stop_alarm_playback():

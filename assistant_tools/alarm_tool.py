@@ -30,6 +30,7 @@ from functools import wraps
 from assistant_tools.alarm_playback import (
     begin_alarm_playback,
     finish_alarm_playback,
+    get_ringing_alarm_ids,
     should_stop_alarm_playback,
     stop_alarm_playback,
 )
@@ -58,6 +59,7 @@ ALARMS_FILE = os.path.join(
 )
 
 DEFAULT_TIMEZONE = "America/Detroit"
+DEFAULT_SNOOZE_MINUTES = 10
 
 
 def _ensure_storage():
@@ -258,6 +260,12 @@ def _detect_action(text):
     normalized = str(text).lower()
 
     if re.search(
+        r"\bsnooze\b",
+        normalized,
+    ):
+        return "snooze"
+
+    if re.search(
         r"\b(?:stop|dismiss|silence)"
         r"(?:\s+(?:the\s+|my\s+)?)?"
         r"(?:ringing\s+)?alarms?\b",
@@ -291,6 +299,35 @@ def _detect_action(text):
         return "show"
 
     return "unknown"
+
+
+def _parse_snooze_minutes(text):
+    normalized = str(text).lower()
+
+    match = re.search(
+        r"\bsnooze(?:\s+(?:the\s+)?alarm)?"
+        r"(?:\s+for)?\s+(\d+)\s*"
+        r"(minutes?|mins?|hours?|hrs?)\b",
+        normalized,
+    )
+
+    if not match:
+        return DEFAULT_SNOOZE_MINUTES
+
+    amount = int(
+        match.group(1)
+    )
+    unit = match.group(2)
+
+    if unit.startswith(
+        (
+            "hour",
+            "hr",
+        )
+    ):
+        amount *= 60
+
+    return amount
 
 
 def _active_alarms(alarms):
@@ -381,6 +418,136 @@ def handle_alarm_query(text):
     )
 
     alarms = _load_alarms()
+
+    # --------------------------------------------------------
+    # SNOOZE CURRENTLY RINGING ALARM
+    # --------------------------------------------------------
+
+    if action == "snooze":
+        ringing_alarm_ids = get_ringing_alarm_ids()
+
+        if not ringing_alarm_ids:
+            return {
+                "success": False,
+                "action": action,
+                "response": "No alarm is currently ringing.",
+                "error": "No ringing alarm.",
+            }
+
+        if len(ringing_alarm_ids) != 1:
+            return {
+                "success": False,
+                "action": action,
+                "response": (
+                    "More than one alarm is currently ringing. "
+                    "Please stop them and set a new alarm."
+                ),
+                "error": "Multiple ringing alarms.",
+            }
+
+        source_alarm_id = ringing_alarm_ids[0]
+
+        source_alarm = next(
+            (
+                alarm
+                for alarm in alarms
+                if str(alarm.get("id")) == source_alarm_id
+            ),
+            None,
+        )
+
+        if source_alarm is None:
+            return {
+                "success": False,
+                "action": action,
+                "response": (
+                    "I couldn't identify the ringing alarm."
+                ),
+                "error": "Ringing alarm record not found.",
+            }
+
+        if source_alarm.get("snoozed_to_alarm_id"):
+            stop_alarm_playback()
+
+            return {
+                "success": False,
+                "action": action,
+                "response": "That alarm has already been snoozed.",
+                "error": "Alarm already snoozed.",
+            }
+
+        minutes = _parse_snooze_minutes(
+            text
+        )
+
+        if minutes < 1 or minutes > 1440:
+            return {
+                "success": False,
+                "action": action,
+                "response": (
+                    "Please choose a snooze time between "
+                    "1 minute and 24 hours."
+                ),
+                "error": "Invalid snooze duration.",
+            }
+
+        stopped = stop_alarm_playback()
+
+        if not stopped:
+            return {
+                "success": False,
+                "action": action,
+                "response": "No alarm is currently ringing.",
+                "error": "Playback ended before snooze.",
+            }
+
+        trigger_at = _now() + timedelta(
+            minutes=minutes
+        )
+
+        snoozed_alarm = {
+            "id": str(
+                uuid.uuid4()
+            ),
+            "created_at": _now().isoformat(),
+            "trigger_at": trigger_at.isoformat(),
+            "timezone": DEFAULT_TIMEZONE,
+            "status": "active",
+            "label": source_alarm.get(
+                "label",
+                "Alarm",
+            ),
+            "snoozed_from_alarm_id": source_alarm_id,
+            "snooze_minutes": minutes,
+        }
+
+        source_alarm["snoozed_at"] = (
+            _now().isoformat()
+        )
+        source_alarm["snoozed_to_alarm_id"] = (
+            snoozed_alarm["id"]
+        )
+
+        alarms.append(
+            snoozed_alarm
+        )
+
+        _save_alarms(
+            alarms
+        )
+
+        return {
+            "success": True,
+            "action": action,
+            "stopped": True,
+            "minutes": minutes,
+            "alarm": snoozed_alarm,
+            "response": (
+                f"Alarm snoozed for {minutes} "
+                f"{'minute' if minutes == 1 else 'minutes'}."
+            ),
+            "error": None,
+        }
 
     # --------------------------------------------------------
     # STOP CURRENTLY RINGING ALARM
@@ -707,7 +874,10 @@ def _stop_linux_sound_process(process):
         )
 
 
-def play_alarm_sound(repetitions=5):
+def play_alarm_sound(
+    repetitions=5,
+    alarm_id=None,
+):
     """
     Play SATURN's interruptible alarm sound.
 
@@ -721,7 +891,9 @@ def play_alarm_sound(repetitions=5):
     )
 
     playback_generation = (
-        begin_alarm_playback()
+        begin_alarm_playback(
+            alarm_id=alarm_id,
+        )
     )
 
     try:

@@ -3,6 +3,51 @@ import os
 import pytest
 
 
+SATURN_TEST_ALARM_MONITOR_VARIABLE = (
+    "SATURN_DISABLE_ALARM_MONITOR"
+)
+
+
+def pytest_configure(config):
+    """
+    Disable real background alarm monitoring before pytest imports
+    test modules. This prevents collection-time imports from starting
+    threads that can mutate isolated alarm files during other tests.
+    """
+
+    original_value = os.environ.get(
+        SATURN_TEST_ALARM_MONITOR_VARIABLE
+    )
+
+    setattr(
+        config,
+        "_saturn_original_alarm_monitor_setting",
+        original_value,
+    )
+
+    os.environ[
+        SATURN_TEST_ALARM_MONITOR_VARIABLE
+    ] = "true"
+
+
+def pytest_unconfigure(config):
+    original_value = getattr(
+        config,
+        "_saturn_original_alarm_monitor_setting",
+        None,
+    )
+
+    if original_value is None:
+        os.environ.pop(
+            SATURN_TEST_ALARM_MONITOR_VARIABLE,
+            None,
+        )
+    else:
+        os.environ[
+            SATURN_TEST_ALARM_MONITOR_VARIABLE
+        ] = original_value
+
+
 SATURN_MODEL_ENVIRONMENT_VARIABLES = (
     "SATURN_LOCAL_MODEL_ENABLED",
     "SATURN_LOCAL_MODEL_NAME",

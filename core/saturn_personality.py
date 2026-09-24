@@ -42,7 +42,23 @@ class SATURN:
         self._alarm_monitor_running = False
         self._alarm_monitor_thread = None
 
-        if start_alarm_monitor:
+        alarm_monitor_disabled = (
+            os.getenv(
+                "SATURN_DISABLE_ALARM_MONITOR",
+                "",
+            ).strip().lower()
+            in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        )
+
+        if (
+            start_alarm_monitor
+            and not alarm_monitor_disabled
+        ):
             self._alarm_monitor_running = True
 
             self._alarm_monitor_thread = threading.Thread(
@@ -327,6 +343,9 @@ class SATURN:
                         target=play_alarm_sound,
                         kwargs={
                             "repetitions": 5,
+                            "alarm_id": alarm.get(
+                                "id"
+                            ),
                         },
                         daemon=True,
                         name="SATURNAlarmSound",
@@ -854,6 +873,20 @@ class SATURN:
         # Alarm routing
         # --------------------------------------------------------
 
+        bare_snooze_commands = {
+            "snooze",
+            "snooze alarm",
+            "snooze the alarm",
+        }
+
+        if normalized in bare_snooze_commands:
+            from assistant_tools.alarm_playback import (
+                is_alarm_ringing,
+            )
+
+            if is_alarm_ringing():
+                return "alarms"
+
         bare_stop_commands = {
             "stop",
             "dismiss",
@@ -884,6 +917,11 @@ class SATURN:
             r"\b(?:stop|dismiss|silence)"
             r"(?:\s+(?:the\s+|my\s+)?)?"
             r"(?:ringing\s+)?alarms?\b",
+            r"\bsnooze"
+            r"(?:\s+(?:the\s+|my\s+)?)?"
+            r"(?:ringing\s+)?alarm\b",
+            r"\bsnooze(?:\s+for)?\s+\d+\s*"
+            r"(?:minutes?|mins?|hours?|hrs?)\b",
         ]
 
         if (
