@@ -425,4 +425,3 @@ def test_database_file_is_released_after_operations(
     database_path.unlink()
 
     assert not database_path.exists()
-
