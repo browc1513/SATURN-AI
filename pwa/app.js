@@ -283,7 +283,33 @@ async function addListItem(listName, item) {
         throw new Error("SATURN could not add the item.");
     }
 
-    await loadLists();
+    const items = data.result?.data?.items;
+    if (!Array.isArray(items)) {
+        throw new Error("SATURN returned no updated list items.");
+    }
+    return items;
+}
+
+
+async function updateListItem(listName, oldItem, newItem) {
+    const response = await fetch(
+        `/api/lists/${encodeURIComponent(listName)}/items/${encodeURIComponent(oldItem)}`,
+        {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item: newItem }),
+        }
+    );
+    if (!response.ok) {
+        throw new Error("Edit item request failed.");
+    }
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.result?.items)) {
+        throw new Error(
+            data.result?.response || "SATURN could not edit the item."
+        );
+    }
+    return data.result.items;
 }
 
 
@@ -350,6 +376,96 @@ async function deleteList(listName) {
     }
 
     await loadLists();
+}
+
+
+function renderListItems(card, list) {
+    const existing = card.querySelector(".list-items, .empty-list");
+    if (existing) {
+        existing.remove();
+    }
+    if (!list.items.length) {
+        const empty = document.createElement("p");
+
+        empty.className = "empty-list";
+        empty.textContent = "This list is empty.";
+
+        card.insertBefore(empty, card.querySelector(".add-item-form"));
+    } else {
+        const itemList = document.createElement("ul");
+
+        itemList.className = "list-items editable-list-items";
+
+        for (const item of list.items) {
+            const row = document.createElement("li");
+            row.className = "list-item-row";
+
+            const itemText = document.createElement("span");
+            itemText.className = "list-item-text";
+            itemText.textContent = item;
+
+            const editButton = document.createElement("button");
+            editButton.className = "list-control-button";
+            editButton.type = "button";
+            editButton.textContent = "Edit";
+            editButton.addEventListener("click", async () => {
+                const proposed = prompt("Edit item:", item);
+                if (proposed === null) {
+                    return;
+                }
+                const replacement = proposed.trim();
+                if (!replacement) {
+                    alert("An item cannot be empty.");
+                    return;
+                }
+                editButton.disabled = true;
+                try {
+                    list.items = await updateListItem(
+                        list.name, item, replacement
+                    );
+                    renderListItems(card, list);
+                } catch (error) {
+                    alert(error.message);
+                    editButton.disabled = false;
+                }
+            });
+
+            const removeButton = document.createElement("button");
+
+            removeButton.className = "remove-item-button";
+            removeButton.type = "button";
+            removeButton.textContent = "Remove";
+
+            removeButton.addEventListener(
+                "click",
+                async () => {
+                    removeButton.disabled = true;
+
+                    try {
+                        await removeListItem(
+                            list.name,
+                            item
+                        );
+                    } catch (error) {
+                        alert(
+                            "SATURN could not remove that item."
+                        );
+
+                        removeButton.disabled = false;
+                    }
+                }
+            );
+
+            row.appendChild(itemText);
+            row.appendChild(editButton);
+            row.appendChild(removeButton);
+
+            itemList.appendChild(row);
+        }
+
+        card.insertBefore(itemList, card.querySelector(".add-item-form"));
+    }
+
 }
 
 
@@ -441,60 +557,7 @@ function renderLists(lists) {
 
         card.appendChild(header);
 
-        if (!list.items.length) {
-            const empty = document.createElement("p");
-
-            empty.className = "empty-list";
-            empty.textContent = "This list is empty.";
-
-            card.appendChild(empty);
-        } else {
-            const itemList = document.createElement("ul");
-
-            itemList.className = "list-items editable-list-items";
-
-            for (const item of list.items) {
-                const row = document.createElement("li");
-                row.className = "list-item-row";
-
-                const itemText = document.createElement("span");
-                itemText.className = "list-item-text";
-                itemText.textContent = item;
-
-                const removeButton = document.createElement("button");
-
-                removeButton.className = "remove-item-button";
-                removeButton.type = "button";
-                removeButton.textContent = "Remove";
-
-                removeButton.addEventListener(
-                    "click",
-                    async () => {
-                        removeButton.disabled = true;
-
-                        try {
-                            await removeListItem(
-                                list.name,
-                                item
-                            );
-                        } catch (error) {
-                            alert(
-                                "SATURN could not remove that item."
-                            );
-
-                            removeButton.disabled = false;
-                        }
-                    }
-                );
-
-                row.appendChild(itemText);
-                row.appendChild(removeButton);
-
-                itemList.appendChild(row);
-            }
-
-            card.appendChild(itemList);
-        }
+        renderListItems(card, list);
 
         const form = document.createElement("form");
         form.className = "add-item-form";
@@ -518,21 +581,23 @@ function renderLists(lists) {
             async (event) => {
                 event.preventDefault();
 
+                const value = input.value.trim();
+                if (!value) {
+                    input.focus();
+                    return;
+                }
+
                 button.disabled = true;
-                input.disabled = true;
 
                 try {
-                    await addListItem(
-                        list.name,
-                        input.value
-                    );
+                    list.items = await addListItem(list.name, value);
+                    renderListItems(card, list);
+                    input.value = "";
                 } catch (error) {
-                    alert(
-                        "SATURN could not add that item."
-                    );
-
+                    alert("SATURN could not add that item.");
+                } finally {
                     button.disabled = false;
-                    input.disabled = false;
+                    input.focus();
                 }
             }
         );

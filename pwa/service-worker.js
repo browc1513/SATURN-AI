@@ -1,9 +1,9 @@
-const CACHE_NAME = "saturn-pwa-v8";
+const CACHE_NAME = "saturn-pwa-v9";
 
 const APP_SHELL = [
     "/",
-    "/app/style.css?v=8",
-    "/app/app.js?v=8",
+    "/app/style.css?v=9",
+    "/app/app.js?v=9",
     "/app/manifest.json",
     "/app/icon-192.png",
     "/app/icon-512.png"

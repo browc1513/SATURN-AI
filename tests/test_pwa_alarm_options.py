@@ -78,8 +78,8 @@ def test_pwa_uses_atomic_v6_assets():
         "service-worker.js"
     )
 
-    assert 'href="/app/style.css?v=8"' in index
-    assert 'src="/app/app.js?v=8"' in index
-    assert 'CACHE_NAME = "saturn-pwa-v8"' in worker
-    assert '"/app/style.css?v=8"' in worker
-    assert '"/app/app.js?v=8"' in worker
+    assert 'href="/app/style.css?v=9"' in index
+    assert 'src="/app/app.js?v=9"' in index
+    assert 'CACHE_NAME = "saturn-pwa-v9"' in worker
+    assert '"/app/style.css?v=9"' in worker
+    assert '"/app/app.js?v=9"' in worker

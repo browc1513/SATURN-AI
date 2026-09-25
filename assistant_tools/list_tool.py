@@ -335,6 +335,79 @@ def get_all_lists():
     }
 
 @_locked_list_operation
+def update_list_item(list_name, old_item, new_item):
+    """Replace one existing item without parsing its text as a command."""
+
+    name = _normalize_list_name(list_name)
+    old = str(old_item).strip()
+    new = str(new_item).strip()
+    lists = _load_lists()
+
+    if not old or not new:
+        return {
+            "success": False,
+            "action": "update",
+            "list_name": name,
+            "response": "List items cannot be empty.",
+            "error": "Empty item.",
+        }
+
+    if name not in lists:
+        return {
+            "success": False,
+            "action": "update",
+            "list_name": name,
+            "response": "That list does not exist.",
+            "error": "List does not exist.",
+        }
+
+    index = next(
+        (
+            position
+            for position, item in enumerate(lists[name])
+            if str(item).casefold() == old.casefold()
+        ),
+        None,
+    )
+    if index is None:
+        return {
+            "success": False,
+            "action": "update",
+            "list_name": name,
+            "response": "That item is no longer on the list.",
+            "error": "Item does not exist.",
+        }
+
+    if any(
+        position != index and str(item).casefold() == new.casefold()
+        for position, item in enumerate(lists[name])
+    ):
+        return {
+            "success": False,
+            "action": "update",
+            "list_name": name,
+            "response": "That item is already on the list.",
+            "error": "Duplicate item.",
+        }
+
+    lists[name][index] = new
+    _save_lists(lists)
+    return {
+        "success": True,
+        "action": "update",
+        "list_name": name,
+        "items": list(lists[name]),
+        "old_item": old,
+        "new_item": new,
+        "response": (
+            f"I changed {old} to {new} on your "
+            f"{_display_name(name)} list."
+        ),
+        "error": None,
+    }
+
+
+@_locked_list_operation
 def handle_list_query(text):
     """
     Handle a natural-language persistent list request.

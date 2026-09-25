@@ -9,7 +9,7 @@ from assistant_tools.alarm_tones import (
     list_alarm_tones,
     resolve_alarm_tone,
 )
-from assistant_tools.list_tool import get_all_lists
+from assistant_tools.list_tool import get_all_lists, update_list_item
 from core.saturn_instance import get_saturn
 
 
@@ -57,6 +57,10 @@ class ListCreateRequest(BaseModel):
 
 class ListItemRequest(BaseModel):
     item: str
+
+
+class ListItemUpdateRequest(BaseModel):
+    item: str = Field(min_length=1, max_length=500)
 
 
 class AlarmCreateRequest(BaseModel):
@@ -232,6 +236,23 @@ def add_list_item(
             "success",
             False,
         ),
+        "result": result,
+    }
+
+
+@app.patch("/api/lists/{list_name}/items/{item}")
+def edit_list_item(
+    list_name: str,
+    item: str,
+    request: ListItemUpdateRequest,
+):
+    result = update_list_item(
+        list_name,
+        item,
+        request.item,
+    )
+    return {
+        "success": result["success"],
         "result": result,
     }
 
