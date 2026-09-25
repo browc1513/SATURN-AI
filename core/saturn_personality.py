@@ -632,39 +632,92 @@ class SATURN:
         )
 
         if domain == "math":
-            return self._handle_math_query(
+            result = self._handle_math_query(
                 text
             )
-
-        if domain == "veterinary":
-            return self._handle_veterinary_query(
+        elif domain == "veterinary":
+            result = self._handle_veterinary_query(
                 text
             )
-
-        if domain == "time":
-            return self._handle_time_query(
+        elif domain == "time":
+            result = self._handle_time_query(
                 text
             )
-
-        if domain == "weather":
-            return self._handle_weather_query(
+        elif domain == "weather":
+            result = self._handle_weather_query(
                 text
             )
-
-        if domain == "lists":
-            return self._handle_list_query(
+        elif domain == "lists":
+            result = self._handle_list_query(
                 text
             )
-
-        if domain == "alarms":
-            return self._handle_alarm_query(
+        elif domain == "alarms":
+            result = self._handle_alarm_query(
                 text
             )
+        else:
+            return self._handle_unknown_query(
+                text,
+                session_id=session_id,
+            )
 
-        return self._handle_unknown_query(
+        return self._remember_subsystem_exchange(
+            session_id,
             text,
-            session_id=session_id,
+            result,
         )
+
+    def _remember_subsystem_exchange(
+        self,
+        session_id,
+        text,
+        result,
+    ):
+        """
+        Add successful deterministic subsystem results to the
+        conversation history used by later model follow-ups.
+
+        Conversation responses already save themselves, while
+        control commands and failed subsystem operations must not
+        become conversational context.
+        """
+
+        remembered_domains = {
+            "math",
+            "veterinary",
+            "time",
+            "weather",
+            "lists",
+            "alarms",
+        }
+
+        if not isinstance(
+            result,
+            dict,
+        ):
+            return result
+
+        if not result.get("success"):
+            return result
+
+        if result.get("domain") not in remembered_domains:
+            return result
+
+        response = result.get("response")
+
+        if not (
+            isinstance(response, str)
+            and response.strip()
+        ):
+            return result
+
+        self.conversation_memory.add_exchange(
+            session_id,
+            text,
+            response,
+        )
+
+        return result
 
     def _handle_unknown_query(
         self,
