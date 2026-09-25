@@ -179,6 +179,7 @@ data/*.json.*.tmp
 /data/saturn_lists.json
 /data/saturn_alarms.json
 /data/saturn_alarm_playback.json
+/data/saturn_memory.db*
 
 # Locally installed Piper voice models
 /voice/models/piper/
