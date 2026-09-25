@@ -11,6 +11,7 @@ from assistant_tools.alarm_tones import (
 )
 from assistant_tools.list_tool import get_all_lists, update_list_item
 from core.saturn_instance import get_saturn
+from voice.speech_format import to_speech_text
 
 
 app = FastAPI(
@@ -167,10 +168,14 @@ def query_saturn(request: QueryRequest):
         session_id=request.session_id,
     )
 
+    display_text = result.get("response", "")
+
     return {
         "success": True,
         "query": request.text.strip(),
         "result": result,
+        "display_text": display_text,
+        "speech_text": to_speech_text(display_text),
     }
 
 

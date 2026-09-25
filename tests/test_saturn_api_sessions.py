@@ -78,6 +78,8 @@ def test_query_endpoint_forwards_request_session():
         "success": True,
         "query": "Remember this",
         "result": expected,
+        "display_text": "Session response",
+        "speech_text": "Session response",
     }
     mocked_run_query.assert_called_once_with(
         "Remember this",
@@ -114,3 +116,18 @@ def test_run_query_converts_non_json_numbers():
         )
 
     assert result["data"]["result"] == "5"
+
+
+def test_query_keeps_display_formatting_out_of_speech():
+    display = "# Forecast\n**Rain** \U0001F327\uFE0F at 2 PM."
+    expected = successful_result(display)
+
+    with patch(
+        "api.saturn_api.run_saturn_query",
+        return_value=expected,
+    ):
+        response = query_saturn(QueryRequest(text="Forecast"))
+
+    assert response["result"]["response"] == display
+    assert response["display_text"] == display
+    assert response["speech_text"] == "Forecast. Rain at 2 PM."

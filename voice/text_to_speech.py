@@ -27,6 +27,8 @@ import threading
 import wave
 from pathlib import Path
 
+from voice.speech_format import to_speech_text
+
 
 try:
     from piper import PiperVoice
@@ -68,30 +70,9 @@ def is_voice_enabled():
 
 
 def _clean_for_speech(text):
-    """
-    Make SATURN's formatted output sound natural when spoken.
-    """
+    """Make SATURN's formatted output sound natural when spoken."""
 
-    text = str(text)
-
-    replacements = {
-        "S.A.T.U.R.N.": "Saturn",
-        "°F": " degrees Fahrenheit",
-        "°C": " degrees Celsius",
-        "\n": ". ",
-    }
-
-    for old, new in replacements.items():
-        text = text.replace(
-            old,
-            new,
-        )
-
-    text = " ".join(
-        text.split()
-    )
-
-    return text.strip()
+    return to_speech_text(text)
 
 
 def _load_voice():
