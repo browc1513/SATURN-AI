@@ -175,7 +175,7 @@ def query_saturn(request: QueryRequest):
         "query": request.text.strip(),
         "result": result,
         "display_text": display_text,
-        "speech_text": to_speech_text(display_text),
+        "speech_text": to_speech_text(result.get("speech_text", display_text)),
     }
 
 

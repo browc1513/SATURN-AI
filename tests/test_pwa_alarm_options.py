@@ -70,7 +70,7 @@ def test_alarm_view_loads_alarms_and_tones():
     assert "loadAlarmTones()," in script
 
 
-def test_pwa_uses_atomic_v6_assets():
+def test_pwa_uses_atomic_v10_assets():
     index = read_pwa_file(
         "index.html"
     )
@@ -78,8 +78,8 @@ def test_pwa_uses_atomic_v6_assets():
         "service-worker.js"
     )
 
-    assert 'href="/app/style.css?v=9"' in index
-    assert 'src="/app/app.js?v=9"' in index
-    assert 'CACHE_NAME = "saturn-pwa-v9"' in worker
-    assert '"/app/style.css?v=9"' in worker
-    assert '"/app/app.js?v=9"' in worker
+    assert 'href="/app/style.css?v=10"' in index
+    assert 'src="/app/app.js?v=10"' in index
+    assert 'CACHE_NAME = "saturn-pwa-v10"' in worker
+    assert '"/app/style.css?v=10"' in worker
+    assert '"/app/app.js?v=10"' in worker

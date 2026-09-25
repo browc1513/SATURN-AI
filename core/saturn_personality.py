@@ -1052,9 +1052,8 @@ class SATURN:
             )
         )
 
-        model_system_prompt = (
-            self.local_model_system_prompt
-        )
+        base_model_system_prompt = self.local_model_system_prompt
+        model_system_prompt = base_model_system_prompt
 
         if self.personal_memory is not None:
             persistent_context = (
@@ -1073,6 +1072,23 @@ class SATURN:
                     )
                     + persistent_context
                 )
+
+        from assistant_tools.web_answer import maybe_answer_with_web
+
+        web_result = maybe_answer_with_web(
+            text,
+            self.local_model,
+            system_prompt=base_model_system_prompt,
+            history=[],
+        )
+        if web_result is not None:
+            if web_result.get('success'):
+                self.conversation_memory.add_exchange(
+                    session_id,
+                    text,
+                    web_result['response'],
+                )
+            return web_result
 
         try:
             response = self.local_model.chat(

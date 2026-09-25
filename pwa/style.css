@@ -478,6 +478,21 @@ h1 {
     white-space: pre-wrap;
 }
 
+.chat-sources {
+    margin: 12px 0 0;
+    padding-left: 22px;
+    line-height: 1.4;
+}
+
+.chat-sources li + li {
+    margin-top: 7px;
+}
+
+.chat-sources a {
+    color: #93c5fd;
+    overflow-wrap: anywhere;
+}
+
 .user-message {
     align-self: flex-end;
 

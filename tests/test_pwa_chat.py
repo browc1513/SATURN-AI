@@ -53,17 +53,17 @@ def test_chat_renders_response_as_text():
     assert "innerHTML = message" not in javascript
 
 
-def test_service_worker_uses_v5_cache():
+def test_service_worker_uses_v10_cache():
     service_worker = read_pwa_file(
         "service-worker.js"
     )
 
-    assert 'CACHE_NAME = "saturn-pwa-v9"' in (
+    assert 'CACHE_NAME = "saturn-pwa-v10"' in (
         service_worker
     )
 
 
-def test_pwa_assets_use_matching_v4_cache_urls():
+def test_pwa_assets_use_matching_v10_cache_urls():
     index = Path(
         "pwa/index.html"
     ).read_text(encoding="utf-8")
@@ -72,11 +72,11 @@ def test_pwa_assets_use_matching_v4_cache_urls():
         "pwa/service-worker.js"
     ).read_text(encoding="utf-8")
 
-    assert 'href="/app/style.css?v=9"' in index
-    assert 'src="/app/app.js?v=9"' in index
-    assert 'saturn-pwa-v9' in worker
-    assert '"/app/style.css?v=9"' in worker
-    assert '"/app/app.js?v=9"' in worker
+    assert 'href="/app/style.css?v=10"' in index
+    assert 'src="/app/app.js?v=10"' in index
+    assert 'saturn-pwa-v10' in worker
+    assert '"/app/style.css?v=10"' in worker
+    assert '"/app/app.js?v=10"' in worker
     assert (
         'fetch(event.request, { cache: "no-store" })'
         in worker

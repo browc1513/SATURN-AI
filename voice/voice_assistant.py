@@ -220,7 +220,7 @@ def main():
             # --------------------------------------------------
             # 7. Speak response; allow an exact wake-free stop.
             # --------------------------------------------------
-            if speak_with_interrupt(response):
+            if speak_with_interrupt(result.get('speech_text', response)):
                 print("Spoken reply stopped.")
                 print()
                 continue
@@ -312,7 +312,7 @@ def main():
                     f"S.A.T.U.R.N.: {response}"
                 )
 
-                if speak_with_interrupt(response):
+                if speak_with_interrupt(result.get('speech_text', response)):
                     print("Spoken reply stopped.")
                     print()
                     break

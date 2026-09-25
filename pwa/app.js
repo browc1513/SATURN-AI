@@ -1088,6 +1088,7 @@ function appendChatMessage(
     speaker,
     message,
     messageClass,
+    sources = [],
 ) {
     const messageElement = document.createElement("div");
     messageElement.className =
@@ -1101,6 +1102,50 @@ function appendChatMessage(
 
     messageElement.appendChild(speakerElement);
     messageElement.appendChild(contentElement);
+
+    if (Array.isArray(sources)) {
+        const sourceList = document.createElement("ol");
+        sourceList.className = "chat-sources";
+
+        for (const source of sources) {
+            if (!source || typeof source.url !== "string") {
+                continue;
+            }
+
+            let url;
+            try {
+                url = new URL(source.url);
+            } catch {
+                continue;
+            }
+            if (url.protocol !== "https:") {
+                continue;
+            }
+
+            const item = document.createElement("li");
+            const link = document.createElement("a");
+            link.href = url.href;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = String(
+                source.title || url.hostname
+            );
+            item.appendChild(link);
+
+            if (source.published) {
+                const date = document.createElement("span");
+                date.textContent =
+                    ` (${String(source.published)})`;
+                item.appendChild(date);
+            }
+            sourceList.appendChild(item);
+        }
+
+        if (sourceList.childElementCount) {
+            messageElement.appendChild(sourceList);
+        }
+    }
+
     chatMessages.appendChild(messageElement);
 
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -1164,6 +1209,7 @@ async function sendChatMessage(message) {
             "SATURN",
             reply,
             "assistant-message",
+            data.result?.data?.sources ?? [],
         );
     } catch (error) {
         appendChatMessage(
