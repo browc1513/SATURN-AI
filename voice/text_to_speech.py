@@ -109,6 +109,7 @@ def _load_voice():
 def _synthesize_and_play(
     voice,
     text,
+    cancel_event=None,
 ):
     """
     Synthesize text with Piper and play it through the current
@@ -145,14 +146,36 @@ def _synthesize_and_play(
                 wav_file,
             )
 
-        subprocess.run(
+        if cancel_event is not None and cancel_event.is_set():
+            return
+
+        player = subprocess.Popen(
             [
                 "aplay",
                 "-q",
                 str(temp_path),
             ],
-            check=True,
         )
+        try:
+            while player.poll() is None:
+                if cancel_event is not None and cancel_event.wait(0.05):
+                    player.terminate()
+                    try:
+                        player.wait(timeout=1)
+                    except subprocess.TimeoutExpired:
+                        player.kill()
+                        player.wait()
+                    return
+                if cancel_event is None:
+                    player.wait()
+            if player.returncode:
+                raise subprocess.CalledProcessError(
+                    player.returncode, player.args
+                )
+        finally:
+            if player.poll() is None:
+                player.terminate()
+                player.wait()
 
     finally:
         if (
@@ -191,6 +214,7 @@ def _speech_worker():
             break
 
         text = job["text"]
+        cancel_event = job.get("cancel_event")
 
         finished_event = job.get(
             "finished_event"
@@ -201,6 +225,7 @@ def _speech_worker():
                 _synthesize_and_play(
                     voice,
                     text,
+                    cancel_event=cancel_event,
                 )
 
         except Exception as error:
@@ -316,7 +341,7 @@ def speak_async(text):
     )
 
 
-def speak_and_wait(text):
+def speak_and_wait(text, cancel_event=None):
     """
     Speak text and wait until synthesis and audio playback have
     actually completed.
@@ -344,6 +369,7 @@ def speak_and_wait(text):
         {
             "text": str(text),
             "finished_event": finished_event,
+            "cancel_event": cancel_event,
         }
     )
 

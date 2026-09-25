@@ -12,6 +12,7 @@ from voice.conversation_control import (
     load_voice_timing,
     should_listen_for_follow_up,
 )
+from voice.response_control import speak_with_interrupt
 from voice.speech_to_text import listen_once
 from voice.text_to_speech import speak_and_wait
 from voice.wake_word import (
@@ -217,11 +218,12 @@ def main():
             )
 
             # --------------------------------------------------
-            # 7. Speak response and wait for actual completion
+            # 7. Speak response; allow an exact wake-free stop.
             # --------------------------------------------------
-            speak_and_wait(
-                response
-            )
+            if speak_with_interrupt(response):
+                print("Spoken reply stopped.")
+                print()
+                continue
 
             print()
 
@@ -310,9 +312,10 @@ def main():
                     f"S.A.T.U.R.N.: {response}"
                 )
 
-                speak_and_wait(
-                    response
-                )
+                if speak_with_interrupt(response):
+                    print("Spoken reply stopped.")
+                    print()
+                    break
 
                 print()
 

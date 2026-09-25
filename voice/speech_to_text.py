@@ -27,6 +27,7 @@ def listen_once(
     phrase_threshold=0.25,
     non_speaking_duration=0.5,
     ambient_duration=0.4,
+    recognition_timeout=None,
 ):
     """
     Listen for one spoken request and return a structured result.
@@ -53,6 +54,9 @@ def listen_once(
         }
 
     recognizer = sr.Recognizer()
+
+    if recognition_timeout is not None:
+        recognizer.operation_timeout = float(recognition_timeout)
 
     recognizer.dynamic_energy_threshold = True
     recognizer.pause_threshold = float(
