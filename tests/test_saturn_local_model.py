@@ -19,6 +19,9 @@ def create_config(
         )
     )
 
+    # These tests exercise model routing, not stored user facts.
+    config["personal_memory"] = {"enabled": False}
+
     config["local_model"] = {
         "enabled": enabled,
         "provider": "ollama",
