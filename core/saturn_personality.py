@@ -717,6 +717,12 @@ class SATURN:
         if memory_result is not None:
             return memory_result
 
+        from assistant_tools.web_command import handle_web_read
+
+        web_result = handle_web_read(text)
+        if web_result is not None:
+            return web_result
+
         domain = self._detect_domain(
             text
         )
