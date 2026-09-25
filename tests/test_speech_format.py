@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 
 from voice.speech_format import to_speech_text
 
@@ -42,3 +42,10 @@ def test_tts_boundary_uses_spoken_format():
     assert _clean_for_speech(
         "# **Rain** \U0001F327\uFE0F"
     ) == "Rain"
+
+
+
+def test_inline_math_equation_speaks_without_markup():
+    assert to_speech_text("a four-fold ($m=4$) deformation") == (
+        "a four-fold (m equals 4) deformation"
+    )

@@ -21,6 +21,14 @@ def to_speech_text(value):
     text = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", text)
     text = re.sub(r"https?://[^\s)]+", "", text)
 
+    text = re.sub(
+        r"\$([^$\n]+)\$",
+        lambda match: re.sub(
+            r"\s*=\s*", " equals ", match.group(1)
+        ),
+        text,
+    )
+
     text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
     text = re.sub(
         r"(?m)^\s{0,3}(?:[-*+]\s+|\d+[.)]\s+|>\s*)",
