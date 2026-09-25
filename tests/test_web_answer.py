@@ -134,3 +134,77 @@ def test_unclear_web_decision_does_not_return_unsourced_answer():
     assert result["success"] is False
     assert result["domain"] == "web"
     assert len(saturn.local_model.calls) == 1
+
+
+
+def test_latest_question_requires_dated_recent_source():
+    saturn = saturn_with_model("WEB")
+    undated = [{**RESULTS[0], "published": ""}]
+    with patch("assistant_tools.web_answer.search_web",
+               return_value=undated):
+        with patch("assistant_tools.web_answer.read_public_page",
+                   return_value={
+                       "url": RESULTS[0]["url"],
+                       "text": PAGE_TEXT,
+                   }):
+            result = saturn.handle_query(
+                "What is the latest research on FRCs?"
+            )
+
+    assert result["success"] is False
+    assert "can't identify the latest work" in result["response"]
+    assert result["data"]["sources"][0]["url"] == RESULTS[0]["url"]
+    assert len(saturn.local_model.calls) == 1
+
+
+def test_spoken_answer_omits_model_citation_appendix():
+    saturn = saturn_with_model(
+        "WEB",
+        "FRCs are studied for fusion [1].\n\n"
+        "Citations:\n[1] FRC Research.",
+    )
+    with patch("assistant_tools.web_answer.search_web",
+               return_value=RESULTS):
+        with patch("assistant_tools.web_answer.read_public_page",
+                   return_value={
+                       "url": RESULTS[0]["url"],
+                       "text": PAGE_TEXT,
+                   }):
+            result = saturn.handle_query(
+                "What is the latest research on FRCs?"
+            )
+
+    assert result["success"] is True
+    assert "Citations:" not in result["speech_text"]
+    assert "Sources include FRC Research" in result["speech_text"]
+
+
+
+def test_latest_question_can_select_fourth_dated_result():
+    older = [
+        {
+            "title": f"Older page {index}",
+            "url": f"https://old{index}.example.org/frc",
+            "published": "",
+        }
+        for index in range(3)
+    ]
+    recent = {
+        **RESULTS[0],
+        "published": "2026-09-20",
+    }
+    saturn = saturn_with_model("WEB", "New FRC work [1].")
+    with patch("assistant_tools.web_answer.search_web",
+               return_value=older + [recent]):
+        with patch("assistant_tools.web_answer.read_public_page",
+                   side_effect=lambda url: {
+                       "url": url,
+                       "text": PAGE_TEXT,
+                   }):
+            result = saturn.handle_query(
+                "What is the latest research on FRCs?"
+            )
+
+    assert result["success"] is True
+    assert len(result["data"]["sources"]) == 1
+    assert result["data"]["sources"][0]["url"] == recent["url"]

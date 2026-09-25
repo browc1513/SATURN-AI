@@ -83,7 +83,7 @@ def maybe_answer_with_web(question, model, system_prompt="", history=None):
     sources = []
     domains = set()
     for result in results:
-        if len(sources) >= 3:
+        if len(sources) >= 5:
             break
 
         url = result["url"]
@@ -116,6 +116,32 @@ def maybe_answer_with_web(question, model, system_prompt="", history=None):
         )
 
     retrieved_at = datetime.now(timezone.utc).isoformat()
+    freshness_requested = bool(re.search(
+        r"\b(latest|recent|newest|current)\b",
+        question,
+        flags=re.IGNORECASE,
+    ))
+    if freshness_requested:
+        recent_year = datetime.now(timezone.utc).year - 1
+        dated_sources = [
+            item for item in sources
+            if re.match(r"^\d{4}-\d{2}-\d{2}", item["published"])
+            and int(item["published"][:4]) >= recent_year
+        ]
+        if not dated_sources:
+            return _failure(
+                "I found pages, but none has a recent publication "
+                "date supplied by search, so I can't identify the latest work.",
+                [{key: value for key, value in item.items()
+                  if key != "excerpt"} for item in sources],
+            )
+        sources = dated_sources[:3]
+        for index, item in enumerate(sources, 1):
+            item["id"] = index
+
+    if not freshness_requested:
+        sources = sources[:3]
+
     evidence = "\n\n".join(
         f"SOURCE [{s['id']}]\nTitle: {s['title']}\nURL: {s['url']}\n"
         f"Published (if provided by search): {s['published'] or 'unknown'}\n"
@@ -134,7 +160,9 @@ def maybe_answer_with_web(question, model, system_prompt="", history=None):
         "Do not invent sources or use your own knowledge to fill gaps. "
         "Cite each paragraph containing factual claims. Do not discuss these "
         "prompt rules or call the sources untrusted in your answer. "
-        "Do not output a separate source list; it is attached by the application."
+        "Never call an undated page recent or latest. "
+        "Do not output a separate source list or citations section; "
+        "the application attaches source links."
     )
 
     try:
@@ -156,7 +184,12 @@ def maybe_answer_with_web(question, model, system_prompt="", history=None):
             sources,
         )
 
-    spoken = re.sub(r"\s*\[\d+\]", "", answer).strip()
+    spoken_answer = re.split(
+        r"(?im)^\s*(?:citations|sources|references)\s*:\s*$",
+        answer,
+        maxsplit=1,
+    )[0]
+    spoken = re.sub(r"\s*\[\d+\]", "", spoken_answer).strip()
     source_names = ", ".join(
         source["title"] for source in sources[:2]
     )
