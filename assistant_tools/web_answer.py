@@ -50,6 +50,37 @@ def _may_need_web(question):
     )
 
 
+def _page_publication_date(text):
+    """Read explicitly labeled PMC or arXiv dates from page text."""
+    head = text[:3500]
+
+    arxiv = re.search(
+        r"\[Submitted on (\d{1,2} [A-Za-z]{3} \d{4})\]",
+        head,
+    )
+    if arxiv:
+        try:
+            return datetime.strptime(
+                arxiv.group(1), "%d %b %Y"
+            ).date().isoformat()
+        except ValueError:
+            pass
+
+    pmc = re.search(
+        r"\b(20\d{2}) ([A-Za-z]{3}) (\d{1,2});",
+        head,
+    )
+    if pmc:
+        try:
+            return datetime.strptime(
+                " ".join(pmc.groups()), "%Y %b %d"
+            ).date().isoformat()
+        except ValueError:
+            pass
+
+    return ""
+
+
 def maybe_answer_with_web(question, model, system_prompt="", history=None):
     """Return a sourced result, or None for an ordinary model reply."""
 
@@ -71,6 +102,12 @@ def maybe_answer_with_web(question, model, system_prompt="", history=None):
             "I couldn't decide whether this question needs web sources."
         )
 
+    freshness_requested = bool(re.search(
+        r"\b(latest|recent|newest|current)\b",
+        question,
+        flags=re.IGNORECASE,
+    ))
+
     try:
         results = search_web(question)
     except WebSearchError:
@@ -81,33 +118,71 @@ def maybe_answer_with_web(question, model, system_prompt="", history=None):
         return _failure("I couldn't find sources for that question.")
 
     sources = []
-    domains = set()
-    for result in results:
-        if len(sources) >= 5:
-            break
+    seen_urls = set()
 
-        url = result["url"]
-        host = urlsplit(url).hostname
-        if not host or host in domains:
-            continue
+    def collect(items, limit):
+        for result in items:
+            if len(sources) >= limit:
+                break
+            url = result["url"]
+            try:
+                host = urlsplit(url).hostname
+            except ValueError:
+                continue
+            if not host or url in seen_urls:
+                continue
+            seen_urls.add(url)
 
-        try:
-            page = read_public_page(url)
-        except WebAccessError:
-            continue
+            try:
+                page = read_public_page(url)
+            except WebAccessError:
+                continue
 
-        excerpt = page["text"][:3500].strip()
-        if len(excerpt) < 80:
-            continue
+            excerpt = page["text"][:3500].strip()
+            if len(excerpt) < 80:
+                continue
 
-        domains.add(host)
-        sources.append({
-            "id": len(sources) + 1,
-            "title": result["title"],
-            "url": page["url"],
-            "published": result.get("published", ""),
-            "excerpt": excerpt,
-        })
+            published = result.get("published", "")
+            if not published and host in {
+                "arxiv.org", "pmc.ncbi.nlm.nih.gov"
+            }:
+                published = _page_publication_date(page["text"])
+
+            sources.append({
+                "id": len(sources) + 1,
+                "title": result["title"],
+                "url": page["url"],
+                "published": published,
+                "excerpt": excerpt,
+            })
+
+    collect(results, limit=5)
+
+    recent_year = datetime.now(timezone.utc).year - 1
+    def has_recent_source():
+        return any(
+            re.match(r"^\d{4}-\d{2}-\d{2}", item["published"])
+            and int(item["published"][:4]) >= recent_year
+            for item in sources
+        )
+
+    if freshness_requested and not has_recent_source():
+        topic = re.sub(
+            r"(?i)^.*?\b(?:latest|recent|newest|current)\b"
+            r"(?:\s+research)?(?:\s+on|\s+about)?\s*",
+            "",
+            question,
+            count=1,
+        ).strip(" ?.!")
+        if topic:
+            try:
+                retry = search_web(
+                    f"{topic} {datetime.now(timezone.utc).year} "
+                    "plasma paper arxiv html"
+                )
+            except WebSearchError:
+                retry = []
+            collect(retry, limit=10)
 
     if not sources:
         return _failure(
@@ -116,13 +191,7 @@ def maybe_answer_with_web(question, model, system_prompt="", history=None):
         )
 
     retrieved_at = datetime.now(timezone.utc).isoformat()
-    freshness_requested = bool(re.search(
-        r"\b(latest|recent|newest|current)\b",
-        question,
-        flags=re.IGNORECASE,
-    ))
     if freshness_requested:
-        recent_year = datetime.now(timezone.utc).year - 1
         dated_sources = [
             item for item in sources
             if re.match(r"^\d{4}-\d{2}-\d{2}", item["published"])
@@ -131,7 +200,8 @@ def maybe_answer_with_web(question, model, system_prompt="", history=None):
         if not dated_sources:
             return _failure(
                 "I found pages, but none has a recent publication "
-                "date supplied by search, so I can't identify the latest work.",
+                "date from search or a readable paper, so I can't identify "
+                "the latest work.",
                 [{key: value for key, value in item.items()
                   if key != "excerpt"} for item in sources],
             )

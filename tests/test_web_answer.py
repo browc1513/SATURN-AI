@@ -208,3 +208,46 @@ def test_latest_question_can_select_fourth_dated_result():
     assert result["success"] is True
     assert len(result["data"]["sources"]) == 1
     assert result["data"]["sources"][0]["url"] == recent["url"]
+
+
+
+def test_retry_reads_dated_arxiv_after_five_old_pages():
+    older = [
+        {
+            "title": f"Older page {index}",
+            "url": f"https://old{index}.example.org/frc",
+            "published": "",
+        }
+        for index in range(5)
+    ]
+    recent = {
+        "title": "New arXiv FRC simulation",
+        "url": "https://arxiv.org/abs/2607.11908",
+        "published": "",
+    }
+    saturn = saturn_with_model("WEB", "A 2026 simulation studied FRCs [1].")
+
+    def page(url):
+        prefix = "[Submitted on 2 Jul 2026] " if "arxiv.org" in url else ""
+        return {"url": url, "text": prefix + PAGE_TEXT}
+
+    with patch("assistant_tools.web_answer.search_web",
+               side_effect=[older, [recent]]) as search:
+        with patch("assistant_tools.web_answer.read_public_page",
+                   side_effect=page):
+            result = saturn.handle_query(
+                "What is the latest research on FRCs?"
+            )
+
+    assert search.call_count == 2
+    assert result["success"] is True
+    assert result["data"]["sources"][0]["published"] == "2026-07-02"
+    assert result["data"]["sources"][0]["url"] == recent["url"]
+
+
+def test_pmc_publication_date_is_extracted():
+    from assistant_tools.web_answer import _page_publication_date
+
+    assert _page_publication_date(
+        "Journal. 2025 Apr 12;16:3487. doi:10.123/example"
+    ) == "2025-04-12"
