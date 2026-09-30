@@ -59,3 +59,48 @@ def test_viewer_uses_requested_sample_window(tmp_path):
     record = figure.layout.meta["shots"][0]
     assert record["requested_window_us"] == [0.1, 0.3]
     assert record["displayed_samples"] == 2
+
+
+def test_measurement_overlay_records_windows_and_preserves_raw_data(tmp_path):
+    path = tmp_path / "shot.CSV"
+    path.write_text(
+        '"Model","SL1000"\n'
+        '"BlockNumber","1"\n'
+        '"TraceName","ND",\n'
+        'BlockSize,1000,\n'
+        'Date,2025/10/23,\n'
+        'Time,16:34:38,\n'
+        'VUnit,V,\n'
+        'HResolution,1e-7,\n'
+        'HUnit,s,\n'
+        + ',2\n' * 1000,
+        encoding="utf-8",
+    )
+    original = path.read_bytes()
+    figure = build_figure(
+        [path], reference_sample=501, start_us=-50, stop_us=50,
+        measurement_windows={
+            "Baseline": (-30, -20),
+            "Candidate event": (20, 30),
+        },
+    )
+
+    assert len(figure.layout.shapes) == 2
+    assert figure.data[-1].type == "table"
+    np.testing.assert_array_equal(figure.data[0].y, np.full(1000, 2.0))
+    measurements = figure.layout.meta["shots"][0]["measurements"]
+    for result in measurements.values():
+        assert result["sample_count"] == 100
+        assert result["mean_voltage"] == 2.0
+        assert result["ac_rms_voltage"] == 0.0
+    assert path.read_bytes() == original
+
+
+def test_measurement_overlay_rejects_hidden_window():
+    import pytest
+
+    with pytest.raises(ValueError, match="within the display"):
+        build_figure(
+            [], start_us=0, stop_us=100,
+            measurement_windows={"Baseline": (-30, -20)},
+        )

@@ -2,6 +2,9 @@
 
 import argparse
 from pathlib import Path
+from html import escape
+
+from data_analysis.measurements import measure_window
 
 import plotly.graph_objects as go
 
@@ -10,9 +13,18 @@ from data_analysis.waveforms import (
 )
 
 
-def build_figure(paths, reference_sample=801250, start_us=0.0, stop_us=100.0):
+def build_figure(paths, reference_sample=801250, start_us=0.0,
+                 stop_us=100.0, measurement_windows=None):
     figure = go.Figure()
     records = []
+    table_rows = []
+    windows = dict(measurement_windows or {})
+    for name, bounds in windows.items():
+        if (
+            len(bounds) != 2
+            or not start_us <= bounds[0] < bounds[1] <= stop_us
+        ):
+            raise ValueError("Measurement windows must lie within the display.")
 
     for path in paths:
         waveform = load_waveform(
@@ -44,6 +56,46 @@ def build_figure(paths, reference_sample=801250, start_us=0.0, stop_us=100.0):
             "first_displayed_time_us": float(time[0] * 1e6),
             "last_displayed_time_us": float(time[-1] * 1e6),
         })
+
+        measurements = {}
+        for name, (first_us, last_us) in windows.items():
+            result = measure_window(
+                waveform, first_us * 1e-6, last_us * 1e-6
+            )
+            measurements[name] = result
+            table_rows.append([
+                escape(waveform.summary.filename),
+                escape(str(name)),
+                result["sample_count"],
+                f'{result["mean_voltage"]:.6g}',
+                f'{result["ac_rms_voltage"]:.6g}',
+                f'{result["peak_to_peak_voltage"]:.6g}',
+            ])
+        if windows:
+            records[-1]["measurements"] = measurements
+
+    for index, (name, bounds) in enumerate(windows.items()):
+        figure.add_vrect(
+            x0=bounds[0], x1=bounds[1],
+            fillcolor=["#93c5fd", "#fde68a"][index % 2],
+            opacity=0.25, line_width=0, layer="below",
+            annotation_text=escape(str(name)),
+            annotation_position="top left",
+        )
+
+    if table_rows:
+        figure.add_trace(go.Table(
+            domain={"x": [0, 1], "y": [0, 0.28]},
+            header={"values": [
+                "Shot", "Window", "Samples", "Mean (V)",
+                "AC RMS (V)", "Peak-to-peak (V)",
+            ]},
+            cells={"values": list(map(list, zip(*table_rows)))},
+        ))
+        figure.update_layout(
+            height=850,
+            yaxis={"domain": [0.42, 1]},
+        )
 
     figure.update_layout(
         title=(
