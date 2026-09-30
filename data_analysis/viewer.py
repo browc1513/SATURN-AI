@@ -1,4 +1,4 @@
-﻿"""Interactive raw-waveform comparison with recorded time references."""
+"""Interactive raw-waveform comparison with recorded time references."""
 
 import argparse
 from pathlib import Path
@@ -10,7 +10,7 @@ from data_analysis.waveforms import (
 )
 
 
-def build_figure(paths, reference_sample=801250):
+def build_figure(paths, reference_sample=801250, start_us=0.0, stop_us=100.0):
     figure = go.Figure()
     records = []
 
@@ -19,7 +19,7 @@ def build_figure(paths, reference_sample=801250):
             path, TimeReference(reference_sample)
         )
         time, voltage = select_time_window(
-            waveform, 0.0, 100e-6
+            waveform, start_us * 1e-6, stop_us * 1e-6
         )
         figure.add_trace(go.Scatter(
             x=(time * 1e6).tolist(),
@@ -39,6 +39,10 @@ def build_figure(paths, reference_sample=801250):
             "correction_seconds": 0.0,
             "reference_provisional": True,
             "processing": "raw; no smoothing or baseline subtraction",
+            "requested_window_us": [start_us, stop_us],
+            "displayed_samples": int(voltage.size),
+            "first_displayed_time_us": float(time[0] * 1e6),
+            "last_displayed_time_us": float(time[-1] * 1e6),
         })
 
     figure.update_layout(
@@ -52,7 +56,7 @@ def build_figure(paths, reference_sample=801250):
         hovermode="closest",
         meta={"shots": records},
     )
-    figure.update_xaxes(range=[0, 100])
+    figure.update_xaxes(range=[start_us, stop_us])
     return figure
 
 
@@ -60,6 +64,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", nargs="+")
     parser.add_argument("--reference-sample", type=int, default=801250)
+    parser.add_argument("--start-us", type=float, default=0.0)
+    parser.add_argument("--stop-us", type=float, default=100.0)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
@@ -68,7 +74,9 @@ def main():
         raise SystemExit("Output already exists; choose another filename.")
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    figure = build_figure(args.paths, args.reference_sample)
+    figure = build_figure(
+        args.paths, args.reference_sample, args.start_us, args.stop_us
+    )
     figure.write_html(
         output,
         include_plotlyjs=True,
