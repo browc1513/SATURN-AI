@@ -82,3 +82,57 @@ def test_invalid_project_window_is_rejected(tmp_path, start, stop):
             start_us=start, stop_us=stop,
         )
     assert not project.exists()
+
+
+def test_project_preserves_measurement_windows(tmp_path):
+    shot = shot_file(tmp_path)
+    project = tmp_path / "measurements.json"
+    windows = {"Baseline": [-30.0, -20.0], "Candidate event": [20.0, 30.0]}
+    saved = save_project(
+        project, "Measurements", [shot], 2,
+        start_us=-50, stop_us=100,
+        measurement_windows=windows,
+    )
+    assert load_project(project) == saved
+    assert saved["measurement_windows_us"] == windows
+
+
+@pytest.mark.parametrize(
+    "windows",
+    [
+        {"Outside": [-60, -20]},
+        {"Reversed": [30, 20]},
+        {"Invalid": [float("nan"), 30]},
+        {"": [20, 30]},
+        {"Invalid": [True, 30]},
+        {"Invalid": [20]},
+        [],
+    ],
+)
+def test_invalid_measurement_windows_are_rejected(tmp_path, windows):
+    project = tmp_path / "invalid-measurements.json"
+    with pytest.raises(ValueError, match="Measurement"):
+        save_project(
+            project, "Invalid", [shot_file(tmp_path)], 2,
+            start_us=-50, stop_us=100,
+            measurement_windows=windows,
+        )
+    assert not project.exists()
+
+
+def test_invalid_saved_measurement_window_is_rejected(tmp_path):
+    import json
+
+    project = tmp_path / "tampered.json"
+    saved = save_project(project, "Original", [shot_file(tmp_path)], 2)
+    saved["measurement_windows_us"] = {"Outside": [-30, -20]}
+    project.write_text(json.dumps(saved), encoding="utf-8")
+    with pytest.raises(ValueError, match="Measurement"):
+        load_project(project)
+
+
+def test_older_project_without_measurement_windows_still_opens(tmp_path):
+    project = tmp_path / "older.json"
+    saved = save_project(project, "Older", [shot_file(tmp_path)], 2)
+    assert "measurement_windows_us" not in saved
+    assert load_project(project) == saved

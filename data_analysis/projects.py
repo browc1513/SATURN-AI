@@ -8,8 +8,30 @@ from pathlib import Path
 from data_analysis.sl1000 import inspect_sl1000
 
 
+
+def _validate_measurement_windows(windows, start_us, stop_us):
+    if not isinstance(windows, dict):
+        raise ValueError("Measurement windows must be a dictionary.")
+    validated = {}
+    for name, bounds in windows.items():
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Measurement window names must be nonempty.")
+        if not isinstance(bounds, (list, tuple)) or len(bounds) != 2:
+            raise ValueError("Measurement windows require two boundaries.")
+        if not all(
+            type(value) in (int, float) and math.isfinite(value)
+            for value in bounds
+        ):
+            raise ValueError("Measurement boundaries must be finite numbers.")
+        if not start_us <= bounds[0] < bounds[1] <= stop_us:
+            raise ValueError("Measurement windows must lie within the display.")
+        validated[name] = list(bounds)
+    return validated
+
+
 def save_project(destination, name, paths, reference_sample=801250,
-                 start_us=0.0, stop_us=100.0):
+                 start_us=0.0, stop_us=100.0,
+                 measurement_windows=None):
     from data_analysis.waveforms import TimeReference
 
     if not isinstance(name, str) or not name.strip():
@@ -20,6 +42,11 @@ def save_project(destination, name, paths, reference_sample=801250,
         and start_us < stop_us
     ):
         raise ValueError("Window must be finite and increasing.")
+
+    windows = _validate_measurement_windows(
+        {} if measurement_windows is None else measurement_windows,
+        start_us, stop_us,
+    )
 
     shots = []
     seen = set()
@@ -50,6 +77,9 @@ def save_project(destination, name, paths, reference_sample=801250,
         "processing": "raw",
         "shots": shots,
     }
+
+    if windows:
+        record["measurement_windows_us"] = windows
 
     text = json.dumps(record, indent=2, allow_nan=False)
     destination = Path(destination)
@@ -84,6 +114,11 @@ def load_project(source):
         for value in window
     ) or window[0] >= window[1]:
         raise ValueError("Window must be finite and increasing.")
+
+    _validate_measurement_windows(
+        record.get("measurement_windows_us", {}),
+        window[0] * 1e6, window[1] * 1e6,
+    )
 
     shots = record.get("shots")
     if not isinstance(shots, list) or not shots:
@@ -144,6 +179,7 @@ def main():
         reference_sample=record["reference_sample_one_based"],
         start_us=record["window_seconds"][0] * 1e6,
         stop_us=record["window_seconds"][1] * 1e6,
+        measurement_windows=record.get("measurement_windows_us", {}),
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     figure.write_html(
