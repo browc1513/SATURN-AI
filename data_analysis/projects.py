@@ -1,17 +1,25 @@
-﻿"""Save local project references and verify source files when reopening."""
+"""Save local project references and verify source files when reopening."""
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 from data_analysis.sl1000 import inspect_sl1000
 
 
-def save_project(destination, name, paths, reference_sample=801250):
+def save_project(destination, name, paths, reference_sample=801250,
+                 start_us=0.0, stop_us=100.0):
     from data_analysis.waveforms import TimeReference
 
     if not isinstance(name, str) or not name.strip():
         raise ValueError("A project name is required.")
+
+    if not (
+        math.isfinite(start_us) and math.isfinite(stop_us)
+        and start_us < stop_us
+    ):
+        raise ValueError("Window must be finite and increasing.")
 
     shots = []
     seen = set()
@@ -38,7 +46,7 @@ def save_project(destination, name, paths, reference_sample=801250):
         "reference_sample_one_based": reference_sample,
         "reference_provisional": True,
         "correction_seconds": 0.0,
-        "window_seconds": [0.0, 100e-6],
+        "window_seconds": [start_us * 1e-6, stop_us * 1e-6],
         "processing": "raw",
         "shots": shots,
     }
@@ -62,12 +70,20 @@ def load_project(source):
     if (
         record.get("reference_provisional") is not True
         or record.get("correction_seconds") != 0.0
-        or record.get("window_seconds") != [0.0, 100e-6]
         or record.get("processing") != "raw"
     ):
         raise ValueError("Unsupported analysis settings.")
     if not isinstance(record.get("name"), str) or not record["name"].strip():
         raise ValueError("Invalid project name.")
+
+    window = record.get("window_seconds")
+    if not isinstance(window, list) or len(window) != 2:
+        raise ValueError("Invalid project window.")
+    if not all(
+        type(value) in (int, float) and math.isfinite(value)
+        for value in window
+    ) or window[0] >= window[1]:
+        raise ValueError("Window must be finite and increasing.")
 
     shots = record.get("shots")
     if not isinstance(shots, list) or not shots:
@@ -100,6 +116,8 @@ def main():
     create = commands.add_parser("create")
     create.add_argument("--name", required=True)
     create.add_argument("--project", required=True)
+    create.add_argument("--start-us", type=float, default=0.0)
+    create.add_argument("--stop-us", type=float, default=100.0)
     create.add_argument("paths", nargs="+")
 
     reopen = commands.add_parser("open")
@@ -108,7 +126,10 @@ def main():
 
     args = parser.parse_args()
     if args.command == "create":
-        save_project(args.project, args.name, args.paths)
+        save_project(
+            args.project, args.name, args.paths,
+            start_us=args.start_us, stop_us=args.stop_us,
+        )
         print("Project saved:", Path(args.project).resolve())
         return
 
@@ -121,6 +142,8 @@ def main():
     figure = build_figure(
         [shot["path"] for shot in record["shots"]],
         reference_sample=record["reference_sample_one_based"],
+        start_us=record["window_seconds"][0] * 1e6,
+        stop_us=record["window_seconds"][1] * 1e6,
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     figure.write_html(

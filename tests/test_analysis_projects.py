@@ -56,3 +56,29 @@ def test_duplicate_source_is_rejected(tmp_path):
     shot = shot_file(tmp_path)
     with pytest.raises(ValueError, match="Duplicate"):
         save_project(tmp_path / "project.json", "Duplicate", [shot, shot], 2)
+
+
+def test_project_preserves_custom_window(tmp_path):
+    shot = shot_file(tmp_path)
+    project = tmp_path / "custom.json"
+    save_project(
+        project, "Custom window", [shot], 2,
+        start_us=-50.0, stop_us=100.0,
+    )
+    window = load_project(project)["window_seconds"]
+    assert window == pytest.approx([-50e-6, 100e-6])
+
+
+@pytest.mark.parametrize(
+    "start,stop",
+    [(10.0, 10.0), (20.0, 10.0), (float("nan"), 100.0)],
+)
+def test_invalid_project_window_is_rejected(tmp_path, start, stop):
+    shot = shot_file(tmp_path)
+    project = tmp_path / "invalid.json"
+    with pytest.raises(ValueError, match="Window"):
+        save_project(
+            project, "Invalid", [shot], 2,
+            start_us=start, stop_us=stop,
+        )
+    assert not project.exists()
