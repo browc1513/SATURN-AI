@@ -47,7 +47,7 @@ def test_six_traces_preserve_values_styles_and_provenance(report):
     original = deepcopy(report)
     figure = build_figure(report)
 
-    assert len(figure.data) == 6
+    assert sum(trace.type == "scatter" for trace in figure.data) == 6
     np.testing.assert_array_equal(figure.data[0].x, [1.0, 2.0])
     assert tuple(figure.data[0].y) == (2e-6, None)
     assert figure.data[0].line.dash == "dash"
@@ -102,7 +102,7 @@ def test_save_preserves_source_and_refuses_overwrite(tmp_path, report):
 
     figure = save_viewer(source, output)
 
-    assert len(figure.data) == 6
+    assert sum(trace.type == "scatter" for trace in figure.data) == 6
     assert source.read_bytes() == original
     assert figure.layout.meta["report_path"] == str(source.resolve())
     html = output.read_text(encoding="utf-8")
@@ -138,3 +138,58 @@ def test_invalid_report_does_not_create_output(tmp_path):
     with pytest.raises(ValueError):
         save_viewer(source, output)
     assert not output.exists()
+
+
+def test_selector_shows_matching_spectra_and_table(report):
+    figure = build_figure(report)
+    buttons = figure.layout.updatemenus[0].buttons
+    assert [button.label for button in buttons] == [
+        "All shots", "shot-0.CSV", "shot-1.CSV", "shot-2.CSV",
+    ]
+    tables = [trace for trace in figure.data if trace.type == "table"]
+    assert len(tables) == 4
+    assert tables[0].visible is True
+    assert all(table.visible is False for table in tables[1:])
+
+    all_mask = list(buttons[0].args[0]["visible"])
+    assert all_mask == [True] * 7 + [False] * 3
+    for shot_index, button in enumerate(buttons[1:]):
+        mask = list(button.args[0]["visible"])
+        assert len(mask) == len(figure.data)
+        assert mask[:6] == [
+            index // 2 == shot_index for index in range(6)
+        ]
+        assert mask[6:] == [False] + [
+            index == shot_index for index in range(3)
+        ]
+
+
+def test_power_table_uses_saved_values_without_changing_spectra(report):
+    report["shots"][0]["spectra"]["Baseline"]["integrated_power_v2"] = 0.25
+    report["shots"][0]["spectra"]["Candidate event"]["integrated_power_v2"] = 2.0
+    original = deepcopy(report)
+    figure = build_figure(report)
+    table = next(trace for trace in figure.data if trace.type == "table")
+    assert table.cells.values[1][0] == "0.25"
+    assert table.cells.values[2][0] == "2"
+    assert table.cells.values[3][0] == "8"
+    assert report == original
+    assert figure.layout.meta["report"] == original
+
+
+def test_zero_baseline_and_missing_named_window_are_explicit(report):
+    report["shots"][0]["spectra"]["Baseline"]["integrated_power_v2"] = 0.0
+    del report["shots"][1]["spectra"]["Candidate event"]
+    figure = build_figure(report)
+    table = next(trace for trace in figure.data if trace.type == "table")
+    assert table.cells.values[1][0] == "0"
+    assert table.cells.values[3][0] == "Undefined"
+    assert table.cells.values[2][1] == "N/A"
+    assert table.cells.values[3][1] == "Undefined"
+
+
+@pytest.mark.parametrize("power", [-1, float("nan"), float("inf"), True, "2", None])
+def test_invalid_saved_power_is_rejected(report, power):
+    report["shots"][0]["spectra"]["Baseline"]["integrated_power_v2"] = power
+    with pytest.raises(ValueError, match="Spectrum integrated power"):
+        build_figure(report)

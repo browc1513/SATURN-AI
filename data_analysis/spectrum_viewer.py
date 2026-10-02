@@ -1,13 +1,43 @@
-﻿"""Display saved voltage spectra without recalculating or modifying them."""
+"""Display saved voltage spectra without recalculating or modifying them."""
 
 import argparse
 from copy import deepcopy
 from html import escape
 import json
+import math
 from pathlib import Path
 
 import numpy as np
 import plotly.graph_objects as go
+
+
+def _comparison_row(shot):
+    spectra = shot["spectra"]
+    baseline = spectra.get("Baseline", {}).get("integrated_power_v2")
+    event = spectra.get("Candidate event", {}).get("integrated_power_v2")
+    ratio = None
+    if baseline is not None and event is not None and baseline > 0:
+        ratio = event / baseline
+        if not math.isfinite(ratio):
+            ratio = None
+    return [
+        escape(shot["filename"]),
+        "N/A" if baseline is None else f"{baseline:.6g}",
+        "N/A" if event is None else f"{event:.6g}",
+        "Undefined" if ratio is None else f"{ratio:.6g}",
+    ]
+
+
+def _power_table(rows, visible):
+    return go.Table(
+        visible=visible,
+        domain={"x": [0, 1], "y": [0, 0.23]},
+        header={"values": [
+            "Shot", "Baseline variance (V?)",
+            "Event variance (V?)", "Event / baseline",
+        ]},
+        cells={"values": list(map(list, zip(*rows)))},
+    )
 
 
 def build_figure(report):
@@ -66,6 +96,14 @@ def build_figure(report):
             ):
                 raise ValueError("Spectrum arrays are invalid.")
 
+            power = spectrum.get("integrated_power_v2")
+            if (
+                type(power) not in (int, float)
+                or not math.isfinite(power)
+                or power < 0
+            ):
+                raise ValueError("Spectrum integrated power must be finite and nonnegative.")
+
             # Keep zero-power bins as gaps; logarithmic axes cannot show zero.
             selected = frequency > 0
             values = [
@@ -103,7 +141,45 @@ def build_figure(report):
             ))
             maximum_frequency = max(maximum_frequency, float(frequency[-1]))
 
+    spectrum_count = len(figure.data)
+    rows = [_comparison_row(shot) for shot in report["shots"]]
+    figure.add_trace(_power_table(rows, visible=True))
+    for row in rows:
+        figure.add_trace(_power_table([row], visible=False))
+
+    total_count = len(figure.data)
+    all_visible = [
+        index <= spectrum_count for index in range(total_count)
+    ]
+    buttons = [{
+        "label": "All shots",
+        "method": "update",
+        "args": [{"visible": all_visible}],
+    }]
+    for shot_index, shot in enumerate(report["shots"]):
+        visible = [
+            trace.meta["shot_index"] == shot_index
+            for trace in figure.data[:spectrum_count]
+        ]
+        visible += [False] + [
+            index == shot_index for index in range(len(rows))
+        ]
+        buttons.append({
+            "label": escape(shot["filename"]),
+            "method": "update",
+            "args": [{"visible": visible}],
+        })
+
     figure.update_layout(
+        updatemenus=[{
+            "buttons": buttons,
+            "active": 0,
+            "x": 1.03,
+            "y": 1.0,
+            "xanchor": "left",
+            "yanchor": "top",
+            "direction": "down",
+        }],
         title=(
             "Baseline and candidate-event voltage spectra"
             "<br><sup>Saved spectra · DC omitted · zero-power bins shown as gaps"
@@ -114,9 +190,19 @@ def build_figure(report):
         yaxis_title="Power spectral density (V²/Hz)",
         yaxis_type="log",
         hovermode="closest",
-        height=800,
-        legend={"orientation": "h", "y": -0.2, "x": 0},
-        margin={"t": 110, "b": 180},
+        height=1000,
+        yaxis={"domain": [0.43, 1]},
+        legend={"orientation": "h", "y": 0.33, "x": 0},
+        margin={"t": 180, "b": 60, "r": 230},
+        annotations=[{
+            "text": (
+                "Table uses saved full-spectrum voltage variance, including DC. "
+                "Ratio is not neutron yield or signal-to-noise ratio."
+            ),
+            "xref": "paper", "yref": "paper",
+            "x": 0, "y": 0.27, "xanchor": "left",
+            "showarrow": False, "font": {"size": 11},
+        }],
         meta={
             "report": deepcopy(report),
             "display": {
@@ -160,7 +246,8 @@ def main():
     args = parser.parse_args()
     figure = save_viewer(args.report, args.output)
     print(f"Saved: {Path(args.output).resolve()}")
-    print(f"Spectra displayed: {len(figure.data)}")
+    count = sum(trace.type == "scatter" for trace in figure.data)
+    print(f"Spectra displayed: {count}")
 
 
 if __name__ == "__main__":

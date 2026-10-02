@@ -67,7 +67,7 @@ def test_saved_report_round_trips_into_viewer(tmp_path, project_files):
     reopened = json.loads(output.read_text(encoding="utf-8"))
     assert reopened == report
     figure = build_figure(reopened)
-    assert len(figure.data) == 2
+    assert sum(trace.type == "scatter" for trace in figure.data) == 2
     assert figure.layout.meta["report"] == report
 
 
