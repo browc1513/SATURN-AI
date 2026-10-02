@@ -14,6 +14,7 @@ sys.path.append(PROJECT_ROOT)
 
 # ---------- Import S.A.T.U.R.N. ----------
 
+from gui.analysis_panel import open_analysis_panel
 from core.saturn_instance import get_saturn
 from voice.speech_to_text import listen_once
 from voice.text_to_speech import (
@@ -249,6 +250,20 @@ main_frame.pack(
 # ============================================================
 # CHAT OUTPUT WINDOW
 # ============================================================
+
+analysis_toolbar = tk.Frame(main_frame, bg="#1e1e1e")
+analysis_toolbar.pack(fill="x", padx=12, pady=(8, 0))
+
+analysis_button = tk.Button(
+    analysis_toolbar,
+    text="Data Analysis",
+    command=lambda: open_analysis_panel(root),
+    font=("Consolas", 11),
+    padx=12,
+    pady=6,
+)
+analysis_button.pack(side="left")
+
 
 chat_frame = tk.Frame(
     main_frame,
