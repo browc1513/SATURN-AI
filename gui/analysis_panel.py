@@ -15,16 +15,24 @@ def default_output_folder():
     return base / "SATURN" / "analysis"
 
 
-def generate_outputs(project_path, output_folder):
+def generate_outputs(project_path, output_folder, operation="spectra"):
     """Generate reports without accessing Tkinter or opening a browser."""
-    from data_analysis.spectrum_report import save_report
-    from data_analysis.spectrum_viewer import save_viewer
+    if operation == "spectra":
+        from data_analysis.spectrum_report import save_report
+        from data_analysis.spectrum_viewer import save_viewer
+        stem = "spectra"
+    elif operation == "sensitivity":
+        from data_analysis.window_sensitivity import save_report
+        from data_analysis.sensitivity_viewer import save_viewer
+        stem = "sensitivity"
+    else:
+        raise ValueError(f"Unknown analysis operation: {operation}")
 
     folder = Path(output_folder)
     folder.mkdir(parents=True, exist_ok=True)
-    run = Path(tempfile.mkdtemp(prefix="spectra-", dir=folder))
-    report_path = run / "spectra.json"
-    viewer_path = run / "spectra.html"
+    run = Path(tempfile.mkdtemp(prefix=f"{stem}-", dir=folder))
+    report_path = run / f"{stem}.json"
+    viewer_path = run / f"{stem}.html"
     try:
         report = save_report(project_path, report_path)
         save_viewer(report_path, viewer_path)
@@ -34,12 +42,21 @@ def generate_outputs(project_path, output_folder):
             "Any completed output files have been kept."
         ) from error
 
-    return {
+    result = {
         "report": report_path,
         "viewer": viewer_path,
         "shots": len(report["shots"]),
-        "spectra": sum(len(shot["spectra"]) for shot in report["shots"]),
     }
+    if operation == "sensitivity":
+        result["comparisons"] = sum(len(shot["windows"]) for shot in report["shots"])
+        result["window_results"] = sum(
+            len(cases)
+            for shot in report["shots"]
+            for cases in shot["windows"].values()
+        )
+    else:
+        result["spectra"] = sum(len(shot["spectra"]) for shot in report["shots"])
+    return result
 
 
 def generate_raw_preview(project_path, output_folder):
@@ -87,8 +104,8 @@ class AnalysisPanel:
     def __init__(self, parent):
         self.window = tk.Toplevel(parent)
         self.window.title("SATURN Data Analysis")
-        self.window.geometry("820x420")
-        self.window.minsize(780, 360)
+        self.window.geometry("820x480")
+        self.window.minsize(780, 440)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.closed = False
         self.busy = False
@@ -138,26 +155,33 @@ class AnalysisPanel:
             buttons, text="Generate Spectra", command=self.start
         )
         self.generate_button.pack(side="left")
+        actions = ttk.Frame(frame)
+        actions.grid(row=5, column=0, columnspan=2, sticky="w", pady=8)
+        self.sensitivity_button = ttk.Button(
+            actions, text="Generate Window Sensitivity",
+            command=lambda: self.start("sensitivity"),
+        )
+        self.sensitivity_button.pack(side="left", padx=(0, 8))
         self.open_button = ttk.Button(
-            buttons, text="Open Viewer", command=self.open_viewer,
+            actions, text="Open Viewer", command=self.open_viewer,
             state="disabled",
         )
         self.open_button.pack(side="left", padx=8)
         self.progress = ttk.Progressbar(frame, mode="indeterminate")
-        self.progress.grid(row=5, column=0, columnspan=2, sticky="ew", pady=8)
+        self.progress.grid(row=6, column=0, columnspan=2, sticky="ew", pady=8)
         ttk.Label(
             frame, textvariable=self.status, wraplength=520, justify="left"
-        ).grid(row=6, column=0, columnspan=2, sticky="w", pady=8)
+        ).grid(row=7, column=0, columnspan=2, sticky="w", pady=8)
         ttk.Label(
             frame,
             text="Exploratory voltage spectra; neutron origin unconfirmed.",
             wraplength=520,
-        ).grid(row=7, column=0, columnspan=2, sticky="w", pady=8)
+        ).grid(row=8, column=0, columnspan=2, sticky="w", pady=8)
 
         self.controls = [
             self.project_entry, self.project_button,
             self.output_entry, self.output_button, self.generate_button,
-            self.new_project_button, self.preview_button,
+            self.new_project_button, self.preview_button, self.sensitivity_button,
         ]
         self.poll_id = self.window.after(100, self.poll)
 
@@ -178,7 +202,7 @@ class AnalysisPanel:
         self.project.set(str(path))
         self.viewer = None
         self.open_button.configure(state="disabled")
-        self.status.set("Project saved and selected. Ready to generate spectra.")
+        self.status.set("Project saved and selected. Ready for analysis.")
 
     def choose_project(self):
         initial = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "SATURN" / "projects"
@@ -191,7 +215,7 @@ class AnalysisPanel:
             self.project.set(path)
             self.viewer = None
             self.open_button.configure(state="disabled")
-            self.status.set("Ready to generate spectra from the selected project.")
+            self.status.set("Ready for analysis of the selected project.")
 
     def choose_output(self):
         path = filedialog.askdirectory(
@@ -214,11 +238,11 @@ class AnalysisPanel:
         for control in self.controls:
             control.configure(state="disabled")
         self.progress.start()
-        self.status.set(
-            "Verifying sources and preparing raw waveforms..."
-            if operation == "raw"
-            else "Verifying sources and generating spectra..."
-        )
+        self.status.set({
+            "raw": "Verifying sources and preparing raw waveforms...",
+            "spectra": "Verifying sources and generating spectra...",
+            "sensitivity": "Verifying sources and comparing measurement windows...",
+        }[operation])
         threading.Thread(
             target=self.worker, args=(project, folder, operation),
             daemon=True, name="SATURNDataAnalysis",
@@ -228,8 +252,12 @@ class AnalysisPanel:
         try:
             if operation == "raw":
                 result = generate_raw_preview(project, folder)
-            else:
+            elif operation == "sensitivity":
+                result = generate_outputs(project, folder, operation="sensitivity")
+            elif operation == "spectra":
                 result = generate_outputs(project, folder)
+            else:
+                raise ValueError(f"Unknown analysis operation: {operation}")
         except Exception as error:
             self.results.put(("error", str(error)))
         else:
@@ -252,7 +280,13 @@ class AnalysisPanel:
             else:
                 self.viewer = result["viewer"]
                 self.open_button.configure(state="normal")
-                if "spectra" in result:
+                if "comparisons" in result:
+                    self.status.set(
+                        f'{result["shots"]} shots; {result["comparisons"]} comparisons; '
+                        f'{result["window_results"]} window results.\n'
+                        f'Report: {result["report"]}\nViewer: {result["viewer"]}'
+                    )
+                elif "spectra" in result:
                     self.status.set(
                         f'{result["shots"]} shots; {result["spectra"]} spectra.\n'
                         f'Report: {result["report"]}\nViewer: {result["viewer"]}'

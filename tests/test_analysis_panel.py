@@ -176,3 +176,86 @@ def test_raw_preview_stops_when_project_verification_fails(tmp_path, monkeypatch
     with pytest.raises(ValueError, match="Source file changed"):
         generate_raw_preview("project.json", tmp_path / "output")
     assert not (tmp_path / "output").exists()
+
+
+def test_sensitivity_generation_uses_saved_report_and_unique_runs(tmp_path, monkeypatch):
+    from data_analysis import window_sensitivity, sensitivity_viewer
+
+    calls = []
+
+    def save_report(project, output):
+        calls.append(("report", project, output))
+        output.write_text("saved sensitivity report", encoding="utf-8")
+        return {"shots": [{"windows": {
+            name: {variant: {} for variant in ("Original", "Earlier", "Later", "Wider")}
+            for name in ("Baseline", "Candidate event")
+        }}]}
+
+    def save_viewer(report, output):
+        assert report.read_text(encoding="utf-8") == "saved sensitivity report"
+        calls.append(("viewer", report, output))
+        output.write_text("viewer", encoding="utf-8")
+
+    monkeypatch.setattr(window_sensitivity, "save_report", save_report)
+    monkeypatch.setattr(sensitivity_viewer, "save_viewer", save_viewer)
+    first = generate_outputs("project.json", tmp_path, operation="sensitivity")
+    second = generate_outputs("project.json", tmp_path, operation="sensitivity")
+
+    assert first["shots"] == 1
+    assert first["comparisons"] == 2
+    assert first["window_results"] == 8
+    assert first["report"].name == "sensitivity.json"
+    assert first["viewer"].name == "sensitivity.html"
+    assert first["viewer"].exists()
+    assert first["report"].parent != second["report"].parent
+    assert calls[0][1] == "project.json"
+    assert calls[1][1] == first["report"]
+
+
+def test_sensitivity_report_failure_stops_viewer(tmp_path, monkeypatch):
+    from data_analysis import window_sensitivity, sensitivity_viewer
+
+    def fail(*args):
+        raise ValueError("Source file changed")
+
+    def unexpected(*args):
+        pytest.fail("Viewer must not run after report failure.")
+
+    monkeypatch.setattr(window_sensitivity, "save_report", fail)
+    monkeypatch.setattr(sensitivity_viewer, "save_viewer", unexpected)
+    with pytest.raises(RuntimeError, match="Source file changed"):
+        generate_outputs("project.json", tmp_path, operation="sensitivity")
+    assert not list(tmp_path.rglob("sensitivity.html"))
+
+
+def test_sensitivity_viewer_failure_keeps_report(tmp_path, monkeypatch):
+    from data_analysis import window_sensitivity, sensitivity_viewer
+
+    def report(project, output):
+        output.write_text("completed sensitivity report", encoding="utf-8")
+        return {"shots": []}
+
+    def fail(*args):
+        raise ValueError("Viewer failed")
+
+    monkeypatch.setattr(window_sensitivity, "save_report", report)
+    monkeypatch.setattr(sensitivity_viewer, "save_viewer", fail)
+    with pytest.raises(RuntimeError, match="completed output files"):
+        generate_outputs("project.json", tmp_path, operation="sensitivity")
+    reports = list(tmp_path.rglob("sensitivity.json"))
+    assert len(reports) == 1
+    assert reports[0].read_text(encoding="utf-8") == "completed sensitivity report"
+
+
+def test_worker_routes_sensitivity_and_queues_result(tmp_path):
+    from queue import Queue
+    from unittest.mock import patch
+    from gui.analysis_panel import AnalysisPanel
+
+    panel = AnalysisPanel.__new__(AnalysisPanel)
+    panel.results = Queue()
+    expected = {"viewer": tmp_path / "sensitivity.html", "comparisons": 2}
+    with patch("gui.analysis_panel.generate_outputs", return_value=expected) as generate:
+        panel.worker("project.json", tmp_path, "sensitivity")
+    generate.assert_called_once_with("project.json", tmp_path, operation="sensitivity")
+    assert panel.results.get_nowait() == ("success", expected)
