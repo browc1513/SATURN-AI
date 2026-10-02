@@ -4,26 +4,46 @@ Run commands from the SATURN-AI repository with its Python virtual environment a
 
 ## Inputs and project requirements
 
-The current importer supports the recorded SL1000 CSV format used by the reference shots. It does not provide a general CSV importer.
+The importer supports the recorded SL1000 CSV format used by the reference shots. It does not provide a general CSV importer.
 
-A saved analysis project contains absolute source-file paths, SHA-256 hashes, a one-based reference sample, a display window, and optional named measurement windows.
-
-Spectrum generation requires at least one measurement window. Each window must fit within the project's display window and be fully covered by the recorded waveform. Selection includes the start boundary and excludes the stop boundary.
+A saved project contains absolute source-file paths, SHA-256 hashes, a one-based reference sample, a display window, and named measurement windows.
 
 Keep source CSV files unchanged and at their saved locations. Project loading rejects changed or missing sources. Current projects use provisional time alignment with zero time correction.
 
-## Generate a spectrum report and viewer
+Spectrum and sensitivity generation require measurement windows inside the display window and fully covered by the recording. Sample selection includes the start boundary and excludes the stop boundary.
 
-Use your saved measurement project. This example uses the verified reference-shot project on this PC:
+## Desktop workflow
+
+Launch the desktop application:
+
+```powershell
+python .\gui\saturn_gui.py
+```
+
+Open its Data Analysis panel.
+
+1. Use **New Project...** to select source CSV files and save reference-sample, display-window, baseline, and candidate-event settings. Alternatively, browse to an existing saved project.
+2. Choose an output folder.
+3. Use **Preview Raw Waveforms**, then **Open Viewer**, to inspect raw samples, provisional alignment, measurement windows, and measurements.
+4. Use **Generate Spectra**, then **Open Viewer**, to compare the saved window spectra and voltage variances.
+5. Use **Generate Window Sensitivity**, then **Open Viewer**, to inspect how shifted and wider windows affect the results.
+
+Generation runs in a background worker. The default output folder is `%LOCALAPPDATA%\SATURN\analysis`. Each operation creates a separate run folder. Open Viewer opens the latest successful result.
+
+Completed report files are retained if viewer generation fails. The error message identifies the run folder.
+
+The spectrum viewer offers all-shot and individual-shot selection. Its table shows saved baseline and candidate-event voltage variances and their ratio. A zero baseline gives an undefined ratio; missing named windows display N/A.
+
+## Command-line spectrum report and viewer
+
+Supply a saved project and unused output filenames:
 
 ```powershell
 & {
     $ErrorActionPreference = 'Stop'
-    $folder = Join-Path $env:LOCALAPPDATA 'SATURN\projects'
-    $project = Join-Path $folder 'neutron-measurement-project-20260930-171348.json'
-    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $report = Join-Path $folder "spectra-$stamp.json"
-    $viewer = Join-Path $folder "spectra-$stamp.html"
+    $project = 'C:\path\project.json'
+    $report = 'C:\path\spectra.json'
+    $viewer = 'C:\path\spectra.html'
 
     python -m data_analysis.spectrum_report --project $project --output $report
     if ($LASTEXITCODE -ne 0) { throw 'Spectrum report failed.' }
@@ -35,17 +55,53 @@ Use your saved measurement project. This example uses the verified reference-sho
 }
 ```
 
-Change the project filename to analyze another saved project. Output files are created at the paths supplied by the caller; the commands do not choose a storage folder automatically. Existing output files are never overwritten.
+CLI commands use the supplied output paths. Existing output files are never overwritten.
 
-To redisplay a previously saved report, run only the spectrum_viewer command with a new HTML output filename. Redisplay uses saved spectra and does not reverify the original CSV files.
+To redisplay a saved report, run only the viewer command with a new HTML filename. Redisplay uses saved spectra and does not reverify the original CSV files.
 
-## Inspect the raw waveform
+## Command-line raw waveform preview
 
 ```powershell
 python -m data_analysis.projects open --project "C:\path\project.json" --output "C:\path\raw-viewer.html"
 ```
 
-This reopens the raw waveform comparison with the project's saved measurement windows. Choose a new output filename each time.
+This opens the raw waveform comparison using saved project settings and measurement windows. Choose a new output filename each time.
+
+## Window sensitivity
+
+For each saved measurement window, the sensitivity report calculates four variants:
+
+| Variant | Boundaries |
+| --- | --- |
+| Original | Saved boundaries |
+| Earlier | Shift both boundaries earlier by 20% of the original duration |
+| Later | Shift both boundaries later by 20% of the original duration |
+| Wider | Extend each boundary by 25% of the original duration |
+
+All variants must fit within the display window and recorded waveform. Invalid variants cause generation to fail; they are not clipped.
+
+```powershell
+& {
+    $ErrorActionPreference = 'Stop'
+    $project = 'C:\path\project.json'
+    $report = 'C:\path\sensitivity.json'
+    $viewer = 'C:\path\sensitivity.html'
+
+    python -m data_analysis.window_sensitivity --project $project --output $report
+    if ($LASTEXITCODE -ne 0) { throw 'Sensitivity report failed.' }
+
+    python -m data_analysis.sensitivity_viewer --report $report --output $viewer
+    if ($LASTEXITCODE -ne 0) { throw 'Sensitivity viewer failed.' }
+
+    Start-Process $viewer
+}
+```
+
+The viewer selector chooses a shot and measurement window. Each selection displays four saved spectra and a matching table of boundaries, sample counts, voltage variances, and variance ratios relative to the original window.
+
+A zero original variance gives an undefined ratio. Wider windows change sample count and frequency-bin spacing. Overlapping variants are not independent repeat measurements.
+
+For three shots with two measurement windows each, the report contains six comparisons and 24 window results.
 
 ## Processing and provenance
 
@@ -53,29 +109,36 @@ Each selected window is processed separately:
 
 - Subtract its mean voltage.
 - Apply a rectangular window with no zero padding.
-- Calculate a one-sided power spectral density in V?/Hz.
+- Calculate a one-sided power spectral density in V^2/Hz.
 - Verify that the sum of PSD bins times frequency-bin spacing matches AC RMS squared.
 
-The report records source hashes and paths, time-reference settings, requested window boundaries, sample count, sample interval, sample rate, frequency spacing, removed mean, and processing choices.
+Reports preserve source and project provenance, requested boundaries, sample count, sampling information, removed mean, and processing choices.
 
-The HTML viewer embeds Plotly and the saved report metadata. It displays frequency in MHz on a linear axis and PSD on a logarithmic axis. DC is omitted; zero-power bins appear as gaps. Baseline traces are dashed and candidate-event traces are solid. Matching shot colors repeat when more than three shots are displayed.
+HTML viewers embed Plotly and saved metadata for offline use. Spectrum viewers display frequency in MHz and PSD on a logarithmic axis. DC is omitted from the plot; zero-power bins appear as gaps. Tables use saved full-spectrum integrated power.
 
-Click a legend entry to hide or show a trace. Double-click to isolate one trace. Scroll to zoom.
+Raw previews preserve recorded voltage samples without smoothing or baseline subtraction.
+
+Click legend entries to hide or show spectra. Double-click to isolate a trace. Scroll to zoom.
 
 ## Interpretation limits
 
-These are exploratory spectra of recorded voltage. They do not establish neutron origin, correct the instrument response, or implement filtering or event detection.
+These are exploratory measurements of recorded voltage. They do not establish neutron origin, correct the instrument response, or implement filtering or event detection.
 
-Integrated spectral power is voltage variance in V?, not electrical power in watts or neutron yield.
+Integrated spectral power is mean-subtracted voltage variance in V^2. Variance ratios are not neutron yield or signal-to-noise ratio.
 
-Frequency-bin spacing is 1 / (sample count ? sample interval). For the verified 100-sample windows at 0.1 microseconds per sample, spacing is 100 kHz and Nyquist frequency is 5 MHz. A maximum at 0.1 MHz is the first nonzero bin, not by itself evidence of a characteristic oscillation.
+Frequency-bin spacing is 1 / (sample count * sample interval). For 100 samples at 0.1 microseconds per sample, spacing is 100 kHz and Nyquist frequency is 5 MHz. A maximum at 0.1 MHz is the first nonzero bin, not by itself evidence of a characteristic oscillation.
 
-Short rectangular windows can produce spectral leakage. Compare raw waveforms, window selection, and repeatability before choosing filters.
+Short rectangular windows can produce spectral leakage. Review raw waveform timing, baseline selection, and sensitivity to boundaries before choosing further processing. Neutron attribution requires supporting experimental evidence and detector characterization.
 
 ## Verification
 
+Run the complete regression suite:
+
 ```powershell
-python -m pytest -q tests/test_analysis_spectra.py tests/test_analysis_spectrum_report.py tests/test_analysis_spectrum_viewer.py
+python -m pytest -q
+git diff --check
 ```
 
-The reference-shot acceptance check reproduced all six original spectra and processing metadata exactly. The full suite at that checkpoint passed 573 tests with one skipped test.
+Manual desktop acceptance should cover project creation, raw preview, spectrum generation, sensitivity generation, and opening each result. Check that viewer selectors update both spectra and their corresponding tables.
+
+The reference-shot spectrum acceptance check reproduced all six original spectra and processing metadata exactly. At the desktop sensitivity integration checkpoint, the full suite passed 621 tests with one skipped test.
