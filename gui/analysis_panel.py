@@ -42,12 +42,53 @@ def generate_outputs(project_path, output_folder):
     }
 
 
+def generate_raw_preview(project_path, output_folder):
+    """Verify saved sources and write an offline raw-waveform viewer."""
+    from copy import deepcopy
+    from data_analysis.projects import load_project
+    from data_analysis.viewer import build_figure
+
+    project = load_project(project_path)
+    figure = build_figure(
+        [shot["path"] for shot in project["shots"]],
+        reference_sample=project["reference_sample_one_based"],
+        start_us=project["window_seconds"][0] * 1e6,
+        stop_us=project["window_seconds"][1] * 1e6,
+        measurement_windows=project.get("measurement_windows_us", {}),
+    )
+
+    # Check the hashes of the data actually loaded into the figure as well.
+    records = figure.layout.meta["shots"]
+    if len(records) != len(project["shots"]):
+        raise ValueError("Preview source count does not match the project.")
+    for saved, displayed in zip(project["shots"], records):
+        if saved["sha256"] != displayed["sha256"]:
+            raise ValueError(f'Source file changed: {saved["filename"]}')
+
+    metadata = dict(figure.layout.meta)
+    metadata["project"] = deepcopy(project)
+    metadata["project_path"] = str(Path(project_path).resolve())
+    figure.update_layout(meta=metadata)
+
+    folder = Path(output_folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    run = Path(tempfile.mkdtemp(prefix="waveforms-", dir=folder))
+    viewer_path = run / "waveforms.html"
+    html = figure.to_html(
+        full_html=True, include_plotlyjs=True,
+        config={"scrollZoom": True, "displaylogo": False},
+    )
+    with viewer_path.open("x", encoding="utf-8") as stream:
+        stream.write(html)
+    return {"viewer": viewer_path, "shots": len(records)}
+
+
 class AnalysisPanel:
     def __init__(self, parent):
         self.window = tk.Toplevel(parent)
         self.window.title("SATURN Data Analysis")
-        self.window.geometry("720x420")
-        self.window.minsize(560, 360)
+        self.window.geometry("820x420")
+        self.window.minsize(780, 360)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.closed = False
         self.busy = False
@@ -88,6 +129,11 @@ class AnalysisPanel:
             buttons, text="New Project...", command=self.new_project
         )
         self.new_project_button.pack(side="left", padx=(0, 8))
+        self.preview_button = ttk.Button(
+            buttons, text="Preview Raw Waveforms",
+            command=lambda: self.start("raw"),
+        )
+        self.preview_button.pack(side="left", padx=(0, 8))
         self.generate_button = ttk.Button(
             buttons, text="Generate Spectra", command=self.start
         )
@@ -111,7 +157,7 @@ class AnalysisPanel:
         self.controls = [
             self.project_entry, self.project_button,
             self.output_entry, self.output_button, self.generate_button,
-            self.new_project_button,
+            self.new_project_button, self.preview_button,
         ]
         self.poll_id = self.window.after(100, self.poll)
 
@@ -154,7 +200,7 @@ class AnalysisPanel:
         if path:
             self.output.set(path)
 
-    def start(self):
+    def start(self, operation="spectra"):
         if self.busy:
             return
         project = self.project.get().strip()
@@ -168,15 +214,22 @@ class AnalysisPanel:
         for control in self.controls:
             control.configure(state="disabled")
         self.progress.start()
-        self.status.set("Verifying sources and generating spectra...")
+        self.status.set(
+            "Verifying sources and preparing raw waveforms..."
+            if operation == "raw"
+            else "Verifying sources and generating spectra..."
+        )
         threading.Thread(
-            target=self.worker, args=(project, folder),
+            target=self.worker, args=(project, folder, operation),
             daemon=True, name="SATURNDataAnalysis",
         ).start()
 
-    def worker(self, project, folder):
+    def worker(self, project, folder, operation="spectra"):
         try:
-            result = generate_outputs(project, folder)
+            if operation == "raw":
+                result = generate_raw_preview(project, folder)
+            else:
+                result = generate_outputs(project, folder)
         except Exception as error:
             self.results.put(("error", str(error)))
         else:
@@ -199,10 +252,17 @@ class AnalysisPanel:
             else:
                 self.viewer = result["viewer"]
                 self.open_button.configure(state="normal")
-                self.status.set(
-                    f'{result["shots"]} shots; {result["spectra"]} spectra.\n'
-                    f'Report: {result["report"]}\nViewer: {result["viewer"]}'
-                )
+                if "spectra" in result:
+                    self.status.set(
+                        f'{result["shots"]} shots; {result["spectra"]} spectra.\n'
+                        f'Report: {result["report"]}\nViewer: {result["viewer"]}'
+                    )
+                else:
+                    self.status.set(
+                        f'{result["shots"]} raw waveforms; saved measurement windows.\n'
+                        f'Viewer: {result["viewer"]}\n'
+                        "Click Open Viewer to inspect alignment and windows."
+                    )
         self.poll_id = self.window.after(100, self.poll)
 
     def open_viewer(self):

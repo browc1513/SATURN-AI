@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 
 from gui.analysis_panel import generate_outputs
 
@@ -68,3 +68,111 @@ def test_viewer_failure_keeps_completed_report(tmp_path, monkeypatch):
     reports = list(tmp_path.rglob("spectra.json"))
     assert len(reports) == 1
     assert reports[0].read_text(encoding="utf-8") == "completed report"
+
+
+def test_raw_preview_preserves_project_sources_and_saved_settings(tmp_path):
+    from html.parser import HTMLParser
+    from data_analysis.projects import save_project
+    from gui.analysis_panel import generate_raw_preview
+
+    shot = tmp_path / "shot.CSV"
+    shot.write_text(
+        '"Model","SL1000"\n'
+        '"BlockNumber","1"\n'
+        '"TraceName","ND",\n'
+        'BlockSize,1000,\n'
+        'Date,2025/10/23,\n'
+        'Time,16:34:38,\n'
+        'VUnit,V,\n'
+        'HResolution,1e-7,\n'
+        'HUnit,s,\n'
+        + ',2\n' * 1000,
+        encoding="utf-8",
+    )
+    project = tmp_path / "project.json"
+    save_project(
+        project, "Raw preview test", [shot],
+        reference_sample=501, start_us=-50, stop_us=50,
+        measurement_windows={
+            "Baseline": [-30, -20], "Candidate event": [20, 30],
+        },
+    )
+    originals = [shot.read_bytes(), project.read_bytes()]
+    first = generate_raw_preview(project, tmp_path / "output")
+    second = generate_raw_preview(project, tmp_path / "output")
+    assert first["shots"] == 1
+    assert first["viewer"] != second["viewer"]
+    assert [shot.read_bytes(), project.read_bytes()] == originals
+    html = first["viewer"].read_text(encoding="utf-8")
+    assert "Raw preview test" in html
+    assert '"reference_sample_one_based":501' in html
+    import json
+    import re
+
+    match = re.search(r'"requested_window_us"\s*:\s*(\[[^\]]*\])', html)
+    assert match is not None
+    assert json.loads(match.group(1)) == pytest.approx([-50.0, 50.0])
+    assert '"Baseline"' in html
+    assert '"Candidate event"' in html
+
+    class Scripts(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.sources = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag.lower() == "script":
+                self.sources.extend(
+                    value for name, value in attrs if name.lower() == "src"
+                )
+
+    scripts = Scripts()
+    scripts.feed(html)
+    assert scripts.sources == []
+
+
+def test_raw_preview_rejects_source_changed_during_loading(tmp_path, monkeypatch):
+    import plotly.graph_objects as go
+    from data_analysis import projects, viewer
+    from gui.analysis_panel import generate_raw_preview
+
+    project = {
+        "shots": [{"path": "shot.CSV", "filename": "shot.CSV", "sha256": "saved"}],
+        "reference_sample_one_based": 501,
+        "window_seconds": [-50e-6, 50e-6],
+        "measurement_windows_us": {"Baseline": [-30, -20]},
+    }
+    monkeypatch.setattr(projects, "load_project", lambda path: project)
+
+    def changed(paths, **settings):
+        assert paths == ["shot.CSV"]
+        assert settings["reference_sample"] == 501
+        assert settings["start_us"] == pytest.approx(-50)
+        assert settings["stop_us"] == pytest.approx(50)
+        assert settings["measurement_windows"] == {"Baseline": [-30, -20]}
+        figure = go.Figure()
+        figure.update_layout(meta={"shots": [{"sha256": "changed"}]})
+        return figure
+
+    monkeypatch.setattr(viewer, "build_figure", changed)
+    output = tmp_path / "output"
+    with pytest.raises(ValueError, match="Source file changed"):
+        generate_raw_preview("project.json", output)
+    assert not output.exists()
+
+
+def test_raw_preview_stops_when_project_verification_fails(tmp_path, monkeypatch):
+    from data_analysis import projects, viewer
+    from gui.analysis_panel import generate_raw_preview
+
+    def fail(path):
+        raise ValueError("Source file changed")
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Waveforms must not load after project verification fails.")
+
+    monkeypatch.setattr(projects, "load_project", fail)
+    monkeypatch.setattr(viewer, "build_figure", unexpected)
+    with pytest.raises(ValueError, match="Source file changed"):
+        generate_raw_preview("project.json", tmp_path / "output")
+    assert not (tmp_path / "output").exists()
