@@ -1,4 +1,4 @@
-﻿"""Desktop controls for the saved-project spectrum workflow."""
+"""Desktop controls for the saved-project spectrum workflow."""
 
 import os
 from pathlib import Path
@@ -53,6 +53,7 @@ class AnalysisPanel:
         self.busy = False
         self.viewer = None
         self.results = Queue()
+        self.project_dialog = None
         self.project = tk.StringVar()
         self.output = tk.StringVar(value=str(default_output_folder()))
         self.status = tk.StringVar(value="Select a saved measurement project.")
@@ -83,6 +84,10 @@ class AnalysisPanel:
 
         buttons = ttk.Frame(frame)
         buttons.grid(row=4, column=0, columnspan=2, sticky="w", pady=8)
+        self.new_project_button = ttk.Button(
+            buttons, text="New Project...", command=self.new_project
+        )
+        self.new_project_button.pack(side="left", padx=(0, 8))
         self.generate_button = ttk.Button(
             buttons, text="Generate Spectra", command=self.start
         )
@@ -106,8 +111,28 @@ class AnalysisPanel:
         self.controls = [
             self.project_entry, self.project_button,
             self.output_entry, self.output_button, self.generate_button,
+            self.new_project_button,
         ]
         self.poll_id = self.window.after(100, self.poll)
+
+    def new_project(self):
+        from gui.project_dialog import ProjectDialog
+
+        existing = self.project_dialog
+        if existing is not None and not existing.closed:
+            existing.window.deiconify()
+            existing.window.lift()
+            return
+        folder = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "SATURN" / "projects"
+        self.project_dialog = ProjectDialog(
+            self.window, self.project_saved, folder
+        )
+
+    def project_saved(self, path):
+        self.project.set(str(path))
+        self.viewer = None
+        self.open_button.configure(state="disabled")
+        self.status.set("Project saved and selected. Ready to generate spectra.")
 
     def choose_project(self):
         initial = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "SATURN" / "projects"
@@ -190,6 +215,13 @@ class AnalysisPanel:
                 self.status.set(f"Could not open browser: {error}\n{self.viewer}")
 
     def close(self):
+        dialog = self.project_dialog
+        if dialog is not None and not dialog.closed:
+            if dialog.busy:
+                self.status.set("Wait for project saving to finish before closing.")
+                dialog.window.lift()
+                return
+            dialog.close()
         self.closed = True
         self.window.after_cancel(self.poll_id)
         self.window.destroy()
